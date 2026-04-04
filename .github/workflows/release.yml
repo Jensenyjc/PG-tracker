@@ -30,8 +30,8 @@ jobs:
       - name: Build Application
         run: npm run build
 
-      - name: Build Windows Portable
-        run: npx electron-builder --win portable
+      - name: Build Windows Installer
+        run: npx electron-builder --win nsis
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1

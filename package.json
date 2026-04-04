@@ -49,9 +49,16 @@
       }
     ],
     "win": {
-      "target": "dir",
-      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "target": "nsis",
+      "artifactName": "${productName}-Setup-${version}.${ext}",
       "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PG-Tracker"
     },
     "mac": {
       "target": "dir"
