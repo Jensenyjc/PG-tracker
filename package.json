@@ -9,17 +9,19 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "postinstall": "prisma generate && electron-builder install-app-deps",
-    "build:win": "electron-vite build && electron-builder --win dir",
-    "build:mac": "electron-vite build && electron-builder --mac",
-    "build:linux": "electron-vite build && electron-builder --linux",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "build:win": "npm run build && npm run prisma:generate && electron-builder --win dir",
+    "build:mac": "npm run build && npm run prisma:generate && electron-builder --mac",
+    "build:linux": "npm run build && npm run prisma:generate && electron-builder --linux"
   },
   "build": {
     "appId": "com.pg-tracker.app",
     "productName": "PG-Tracker",
     "asar": true,
     "asarUnpack": [
-      "node_modules/@prisma/client/**"
+      "**/node_modules/@prisma/engines/**",
+      "**/node_modules/.prisma/**",
+      "**/*.node"
     ],
     "directories": {
       "buildResources": "build",
@@ -27,17 +29,23 @@
     },
     "files": [
       "out/**/*",
+      "prisma/**/*",
       "node_modules/@prisma/client/**/*",
-      "prisma/**/*"
+      "node_modules/.prisma/**/*",
+      "node_modules/@prisma/engines/**/*"
     ],
     "extraResources": [
       {
-        "from": "prisma/dev.db",
-        "to": "prisma/dev.db"
+        "from": "prisma",
+        "to": "prisma"
       },
       {
-        "from": "node_modules/.prisma/client",
-        "to": "prisma-client"
+        "from": "node_modules/.prisma",
+        "to": ".prisma"
+      },
+      {
+        "from": "node_modules/@prisma/engines",
+        "to": "node_modules/@prisma/engines"
       }
     ],
     "win": {
@@ -75,6 +83,7 @@
     "zustand": "^5.0.1"
   },
   "devDependencies": {
+    "@electron-toolkit/tsconfig": "^2.0.0",
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
