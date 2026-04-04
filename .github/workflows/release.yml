@@ -31,7 +31,7 @@ jobs:
         run: npm run build
 
       - name: Build Windows Installer
-        run: npx electron-builder --win nsis
+        run: npx electron-builder --win nsis --publish never
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
