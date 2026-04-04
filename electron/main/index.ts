@@ -1,40 +1,107 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import { join } from 'path'
+import { join, dirname } from 'path'
+import { existsSync, copyFileSync, mkdirSync } from 'fs'
 import log from 'electron-log'
-import { PrismaClient } from '@prisma/client'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 
 const execAsync = promisify(exec)
 
-// Initialize Prisma
-const prisma = new PrismaClient()
+// Platform detection
+const isDev = !app.isPackaged
+const platform = process.platform || 'win32'
 
-// Setup logging
-log.transports.file.level = 'info'
-log.info('Application starting...')
+// ==================== Prisma Client 初始化 ====================
+let prisma: any = null
 
-// Custom is object
-const is = {
-  dev: !app.isPackaged
-}
+/**
+ * 获取数据库路径。
+ * 开发环境：项目根目录 prisma/dev.db
+ * 生产环境：userData 目录（可写），首次运行时从 extraResources 复制
+ */
+function getDatabasePath(): string {
+  if (isDev) {
+    return join(__dirname, '../../prisma/dev.db')
+  }
 
-// Platform shortcuts optimizer
-function watchWindowShortcuts(window: BrowserWindow): void {
-  window.webContents.on('before-input-event', (_, input) => {
-    if (input.type === 'keyDown') {
-      if (!is.dev) {
-        if (input.code === 'KeyR' && (input.control || input.meta)) {
-          event.preventDefault()
-        }
-        if (input.code === 'KeyI' && (input.alt && input.meta || input.control && input.shift)) {
-          event.preventDefault()
-        }
-      }
+  // 生产环境：使用 userData 目录（可写，不在 asar 内）
+  const userDataPath = app.getPath('userData')
+  const userDbPath = join(userDataPath, 'dev.db')
+
+  // 如果 userData 中没有 db 文件，从 extraResources 复制一份
+  if (!existsSync(userDbPath)) {
+    const resourceDbPath = join(process.resourcesPath, 'prisma', 'dev.db')
+    log.info('Copying database from resources to userData:', resourceDbPath, '->', userDbPath)
+    if (existsSync(resourceDbPath)) {
+      copyFileSync(resourceDbPath, userDbPath)
+    } else {
+      log.warn('No seed database found at:', resourceDbPath)
     }
-  })
+  }
+
+  return userDbPath
 }
 
+/**
+ * 获取 Prisma Client 模块路径。
+ * 开发环境：node_modules/.prisma/client
+ * 生产环境：extraResources/prisma-client（通过 extraResources 复制）
+ */
+function getPrismaClientPath(): string {
+  if (isDev) {
+    return join(__dirname, '../../node_modules/.prisma/client')
+  }
+
+  // 生产环境：extraResources 中的 prisma-client 目录
+  const extraPrismaPath = join(process.resourcesPath, 'prisma-client')
+  log.info('Prisma client path (extraResources):', extraPrismaPath)
+  log.info('index.js exists:', existsSync(join(extraPrismaPath, 'index.js')))
+  return extraPrismaPath
+}
+
+async function getPrisma(): Promise<any> {
+  if (!prisma) {
+    const prismaPath = getPrismaClientPath()
+    const dbPath = getDatabasePath()
+
+    log.info('=== Prisma Init ===')
+    log.info('  Prisma Client path:', prismaPath)
+    log.info('  Database path:', dbPath)
+    log.info('  app.isPackaged:', app.isPackaged)
+    log.info('  process.resourcesPath:', process.resourcesPath)
+
+    // 验证关键文件存在
+    const engineFile = join(prismaPath, 'query_engine-windows.dll.node')
+    const schemaFile = join(prismaPath, 'schema.prisma')
+    log.info('  query engine exists:', existsSync(engineFile))
+    log.info('  schema.prisma exists:', existsSync(schemaFile))
+
+    // 告诉 Prisma 引擎的确切位置（生产环境必需）
+    if (!isDev) {
+      process.env.PRISMA_QUERY_ENGINE_LIBRARY = engineFile
+    }
+
+    try {
+      const { PrismaClient } = require(prismaPath)
+      prisma = new PrismaClient({
+        datasources: {
+          db: {
+            url: `file:${dbPath}`
+          }
+        }
+      })
+    } catch (err) {
+      log.error('Failed to load Prisma Client:', err)
+      throw err
+    }
+  }
+  return prisma
+}
+
+log.transports.file.level = 'info'
+log.info('Application starting...', { isDev, platform })
+
+// ==================== 主窗口创建 ====================
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
@@ -63,8 +130,9 @@ function createWindow(): void {
   })
 
   // Load the app
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  const renderUrl = process.env.ELECTRON_RENDERER_URL
+  if (isDev && renderUrl) {
+    mainWindow.loadURL(renderUrl)
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
@@ -74,7 +142,8 @@ function createWindow(): void {
 
 ipcMain.handle('institution:getAll', async () => {
   try {
-    return await prisma.institution.findMany({
+    const client = await getPrisma()
+    return await client.institution.findMany({
       include: { advisors: true, tasks: true },
       orderBy: { createdAt: 'desc' }
     })
@@ -86,7 +155,8 @@ ipcMain.handle('institution:getAll', async () => {
 
 ipcMain.handle('institution:getById', async (_, id: string) => {
   try {
-    return await prisma.institution.findUnique({
+    const client = await getPrisma()
+    return await client.institution.findUnique({
       where: { id },
       include: {
         advisors: { include: { assets: true, interviews: true } },
@@ -101,7 +171,8 @@ ipcMain.handle('institution:getById', async (_, id: string) => {
 
 ipcMain.handle('institution:create', async (_, data: any) => {
   try {
-    return await prisma.institution.create({
+    const client = await getPrisma()
+    return await client.institution.create({
       data: {
         name: data.name,
         department: data.department,
@@ -122,7 +193,8 @@ ipcMain.handle('institution:create', async (_, data: any) => {
 
 ipcMain.handle('institution:update', async (_, id: string, data: any) => {
   try {
-    return await prisma.institution.update({
+    const client = await getPrisma()
+    return await client.institution.update({
       where: { id },
       data: {
         name: data.name,
@@ -144,7 +216,8 @@ ipcMain.handle('institution:update', async (_, id: string, data: any) => {
 
 ipcMain.handle('institution:delete', async (_, id: string) => {
   try {
-    await prisma.institution.delete({ where: { id } })
+    const client = await getPrisma()
+    await client.institution.delete({ where: { id } })
     return true
   } catch (error) {
     log.error('Error deleting institution:', error)
@@ -156,7 +229,8 @@ ipcMain.handle('institution:delete', async (_, id: string) => {
 
 ipcMain.handle('advisor:getByInstitution', async (_, institutionId: string) => {
   try {
-    return await prisma.advisor.findMany({
+    const client = await getPrisma()
+    return await client.advisor.findMany({
       where: { institutionId },
       include: { assets: true, interviews: true }
     })
@@ -168,7 +242,8 @@ ipcMain.handle('advisor:getByInstitution', async (_, institutionId: string) => {
 
 ipcMain.handle('advisor:create', async (_, data: any) => {
   try {
-    return await prisma.advisor.create({
+    const client = await getPrisma()
+    return await client.advisor.create({
       data: {
         institutionId: data.institutionId,
         name: data.name,
@@ -190,7 +265,8 @@ ipcMain.handle('advisor:create', async (_, data: any) => {
 
 ipcMain.handle('advisor:update', async (_, id: string, data: any) => {
   try {
-    return await prisma.advisor.update({
+    const client = await getPrisma()
+    return await client.advisor.update({
       where: { id },
       data: {
         name: data.name,
@@ -213,7 +289,8 @@ ipcMain.handle('advisor:update', async (_, id: string, data: any) => {
 
 ipcMain.handle('advisor:delete', async (_, id: string) => {
   try {
-    await prisma.advisor.delete({ where: { id } })
+    const client = await getPrisma()
+    await client.advisor.delete({ where: { id } })
     return true
   } catch (error) {
     log.error('Error deleting advisor:', error)
@@ -225,7 +302,8 @@ ipcMain.handle('advisor:delete', async (_, id: string) => {
 
 ipcMain.handle('task:getByInstitution', async (_, institutionId: string) => {
   try {
-    return await prisma.task.findMany({
+    const client = await getPrisma()
+    return await client.task.findMany({
       where: { institutionId },
       orderBy: { dueDate: 'asc' }
     })
@@ -237,7 +315,8 @@ ipcMain.handle('task:getByInstitution', async (_, institutionId: string) => {
 
 ipcMain.handle('task:create', async (_, data: any) => {
   try {
-    return await prisma.task.create({
+    const client = await getPrisma()
+    return await client.task.create({
       data: {
         institutionId: data.institutionId,
         title: data.title,
@@ -253,7 +332,8 @@ ipcMain.handle('task:create', async (_, data: any) => {
 
 ipcMain.handle('task:update', async (_, id: string, data: any) => {
   try {
-    return await prisma.task.update({
+    const client = await getPrisma()
+    return await client.task.update({
       where: { id },
       data: {
         title: data.title,
@@ -269,7 +349,8 @@ ipcMain.handle('task:update', async (_, id: string, data: any) => {
 
 ipcMain.handle('task:delete', async (_, id: string) => {
   try {
-    await prisma.task.delete({ where: { id } })
+    const client = await getPrisma()
+    await client.task.delete({ where: { id } })
     return true
   } catch (error) {
     log.error('Error deleting task:', error)
@@ -281,7 +362,8 @@ ipcMain.handle('task:delete', async (_, id: string) => {
 
 ipcMain.handle('asset:create', async (_, data: any) => {
   try {
-    return await prisma.asset.create({
+    const client = await getPrisma()
+    return await client.asset.create({
       data: {
         advisorId: data.advisorId,
         type: data.type,
@@ -296,7 +378,8 @@ ipcMain.handle('asset:create', async (_, data: any) => {
 
 ipcMain.handle('asset:delete', async (_, id: string) => {
   try {
-    await prisma.asset.delete({ where: { id } })
+    const client = await getPrisma()
+    await client.asset.delete({ where: { id } })
     return true
   } catch (error) {
     log.error('Error deleting asset:', error)
@@ -308,7 +391,8 @@ ipcMain.handle('asset:delete', async (_, id: string) => {
 
 ipcMain.handle('interview:create', async (_, data: any) => {
   try {
-    return await prisma.interview.create({
+    const client = await getPrisma()
+    return await client.interview.create({
       data: {
         advisorId: data.advisorId,
         date: new Date(data.date),
@@ -324,7 +408,8 @@ ipcMain.handle('interview:create', async (_, data: any) => {
 
 ipcMain.handle('interview:update', async (_, id: string, data: any) => {
   try {
-    return await prisma.interview.update({
+    const client = await getPrisma()
+    return await client.interview.update({
       where: { id },
       data: {
         date: new Date(data.date),
@@ -340,7 +425,8 @@ ipcMain.handle('interview:update', async (_, id: string, data: any) => {
 
 ipcMain.handle('interview:delete', async (_, id: string) => {
   try {
-    await prisma.interview.delete({ where: { id } })
+    const client = await getPrisma()
+    await client.interview.delete({ where: { id } })
     return true
   } catch (error) {
     log.error('Error deleting interview:', error)
@@ -379,7 +465,7 @@ ipcMain.handle('file:openExternal', async (_, path: string) => {
 ipcMain.handle('file:compileLatex', async (_, texPath: string) => {
   try {
     const dir = texPath.substring(0, texPath.lastIndexOf('/') || texPath.lastIndexOf('\\'))
-    const command = process.platform === 'win32'
+    const command = platform === 'win32'
       ? `cd /d "${dir}" && xelatex -interaction=nonstopmode "${texPath}"`
       : `cd "${dir}" && xelatex -interaction=nonstopmode "${texPath}"`
     const { stdout, stderr } = await execAsync(command)
@@ -394,14 +480,15 @@ ipcMain.handle('file:compileLatex', async (_, texPath: string) => {
 
 ipcMain.handle('advisor:getConflictWarnings', async (_, institutionId: string) => {
   try {
-    const institution = await prisma.institution.findUnique({
+    const client = await getPrisma()
+    const institution = await client.institution.findUnique({
       where: { id: institutionId },
       include: { advisors: true }
     })
     if (!institution) return []
 
     const warnings: string[] = []
-    const sentAdvisors = institution.advisors.filter(a => a.contactStatus === 'SENT')
+    const sentAdvisors = institution.advisors.filter((a: any) => a.contactStatus === 'SENT')
     if (sentAdvisors.length > 1) {
       warnings.push(`同一院系 ${institution.name} 有 ${sentAdvisors.length} 位导师处于"已发送"状态但未回复`)
     }
@@ -413,17 +500,20 @@ ipcMain.handle('advisor:getConflictWarnings', async (_, institutionId: string) =
 })
 
 // App lifecycle
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Set app user model id for windows
-  if (process.platform === 'win32' || process.platform === 'darwin') {
+  if (platform === 'win32') {
     app.setAppUserModelId('com.pg-tracker.app')
   }
 
-  prisma.$connect().then(() => {
-    log.info('Database connected')
-  }).catch((error) => {
+  // Initialize Prisma
+  try {
+    const client = await getPrisma()
+    await client.$connect()
+    log.info('Database connected successfully')
+  } catch (error) {
     log.error('Database connection failed:', error)
-  })
+  }
 
   createWindow()
 
@@ -432,9 +522,11 @@ app.whenReady().then(() => {
   })
 })
 
-app.on('window-all-closed', () => {
-  prisma.$disconnect()
-  if (process.platform !== 'darwin') {
+app.on('window-all-closed', async () => {
+  if (prisma) {
+    await prisma.$disconnect()
+  }
+  if (platform !== 'darwin') {
     app.quit()
   }
 })

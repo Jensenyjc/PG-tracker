@@ -9,7 +9,12 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'electron/main/index.ts')
-        }
+        },
+        external: [
+          '@prisma/client',
+          '.prisma/client',
+          '.prisma/client/default'
+        ]
       }
     }
   },

@@ -8,25 +8,48 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "postinstall": "electron-builder install-app-deps",
-    "build:win": "electron-vite build && electron-builder --win --dir",
+    "postinstall": "prisma generate && electron-builder install-app-deps",
+    "build:win": "electron-vite build && electron-builder --win dir",
     "build:mac": "electron-vite build && electron-builder --mac",
-    "build:linux": "electron-vite build && electron-builder --linux"
+    "build:linux": "electron-vite build && electron-builder --linux",
+    "prisma:generate": "prisma generate"
   },
   "build": {
     "appId": "com.pg-tracker.app",
     "productName": "PG-Tracker",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/@prisma/client/**"
+    ],
     "directories": {
       "buildResources": "build",
       "output": "release"
     },
     "files": [
       "out/**/*",
+      "node_modules/@prisma/client/**/*",
       "prisma/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "prisma/dev.db",
+        "to": "prisma/dev.db"
+      },
+      {
+        "from": "node_modules/.prisma/client",
+        "to": "prisma-client"
+      }
     ],
     "win": {
       "target": "dir",
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": "dir"
+    },
+    "linux": {
+      "target": "dir"
     }
   },
   "dependencies": {
@@ -52,7 +75,6 @@
     "zustand": "^5.0.1"
   },
   "devDependencies": {
-    "@electron-toolkit/tsconfig": "^1.0.1",
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
