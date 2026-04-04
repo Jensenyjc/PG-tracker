@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Institution {
+  id              String    @id @default(uuid())
+  name            String
+  department      String
+  tier            String    // REACH, MATCH, SAFETY
+  degreeType      String    // MASTER, PHD
+  campDeadline    DateTime?
+  pushDeadline    DateTime?
+  expectedQuota   Int?
+  policyTags      String    // JSON 格式存储标签
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  advisors        Advisor[]
+  tasks           Task[]
+}
+
+model Advisor {
+  id              String      @id @default(uuid())
+  institutionId   String
+  institution     Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  name            String
+  title           String?
+  researchArea    String
+  email           String
+  homepage        String?
+  contactStatus   String      // PENDING, SENT, REPLIED, INTERVIEW, REJECTED, ACCEPTED
+  lastContactDate DateTime?
+  reputationScore Int?
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  assets          Asset[]
+  interviews      Interview[]
+}
+
+model Task {
+  id              String      @id @default(uuid())
+  institutionId   String
+  institution     Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  title           String
+  dueDate         DateTime
+  isCompleted     Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+}
+
+model Asset {
+  id              String      @id @default(uuid())
+  advisorId       String?
+  advisor         Advisor?    @relation(fields: [advisorId], references: [id], onDelete: SetNull)
+  type            String      // RESUME, TRANSCRIPT, RECOMMENDATION, OTHER
+  localPath       String      // 本地文件绝对路径
+  createdAt       DateTime    @default(now())
+}
+
+model Interview {
+  id              String      @id @default(uuid())
+  advisorId       String
+  advisor         Advisor     @relation(fields: [advisorId], references: [id], onDelete: Cascade)
+  date            DateTime
+  format          String      // ONLINE, OFFLINE
+  markdownNotes   String      // 面经记录
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}

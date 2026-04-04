@@ -1,0 +1,56 @@
+import { useState } from 'react'
+import { useStore, Task } from '../../stores/appStore'
+import { Button } from '../ui/button'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
+
+interface TaskFormProps {
+  institutionId: string
+  task?: Task | null
+  onClose: () => void
+}
+
+export default function TaskForm({ institutionId, task, onClose }: TaskFormProps): JSX.Element {
+  const { addTask, updateTask } = useStore()
+  const [formData, setFormData] = useState({
+    title: task?.title || '',
+    dueDate: task?.dueDate ? task.dueDate.split('T')[0] : ''
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault()
+    if (!formData.title.trim() || !formData.dueDate) return
+    setIsSubmitting(true)
+    try {
+      const data = { institutionId, title: formData.title.trim(), dueDate: formData.dueDate, isCompleted: task?.isCompleted || false }
+      if (task) await updateTask(task.id, data)
+      else await addTask(data)
+      onClose()
+    } catch (error) { console.error('Failed to save task:', error) }
+    finally { setIsSubmitting(false) }
+  }
+
+  return (
+    <Dialog open onOpenChange={() => onClose()}>
+      <DialogContent className="sm:max-w-[400px]">
+        <DialogHeader><DialogTitle>{task ? '编辑任务' : '添加任务'}</DialogTitle></DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="title">任务名称 *</Label>
+            <Input id="title" value={formData.title} onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))} placeholder="如：准备个人陈述" required />
+          </div>
+          <div>
+            <Label htmlFor="dueDate">截止日期 *</Label>
+            <Input id="dueDate" type="date" value={formData.dueDate} onChange={(e) => setFormData((prev) => ({ ...prev, dueDate: e.target.value }))} required />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>取消</Button>
+            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? '保存中...' : task ? '保存修改' : '添加任务'}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}

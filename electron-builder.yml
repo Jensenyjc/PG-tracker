@@ -1,0 +1,19 @@
+appId: com.pg-tracker.app
+productName: PG-Tracker
+directories:
+  buildResources: build
+  output: release
+files:
+  - out/**/*
+  - prisma/**/*
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}

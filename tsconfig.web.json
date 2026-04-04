@@ -1,0 +1,15 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "src/**/*.tsx"
+  ]
+}

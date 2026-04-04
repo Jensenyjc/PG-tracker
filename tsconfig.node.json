@@ -1,0 +1,17 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "composite": true,
+    "noEmit": false,
+    "outDir": "./out/types",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": [
+    "electron.vite.config.*",
+    "electron/**/*"
+  ]
+}
