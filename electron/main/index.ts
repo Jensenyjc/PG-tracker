@@ -28,15 +28,20 @@ function getDatabasePath(): string {
   const userDataPath = app.getPath('userData')
   const userDbPath = join(userDataPath, 'dev.db')
 
-  // 如果 userData 中没有 db 文件，从 extraResources 复制一份
+  // 如果 userData 中没有 db 文件，从 extraResources 复制一份作为初始数据库
+  // 注意：只有首次安装时才复制，之后用户数据会保留在 userData 中
   if (!existsSync(userDbPath)) {
     const resourceDbPath = join(process.resourcesPath, 'prisma', 'dev.db')
-    log.info('Copying database from resources to userData:', resourceDbPath, '->', userDbPath)
+    log.info('First run detected: copying seed database from resources to userData:', resourceDbPath, '->', userDbPath)
     if (existsSync(resourceDbPath)) {
       copyFileSync(resourceDbPath, userDbPath)
     } else {
       log.warn('No seed database found at:', resourceDbPath)
+      // 如果连 seed 都没有，创建一个空数据库文件
+      // Prisma 会在首次连接时自动创建表结构
     }
+  } else {
+    log.info('User database found at:', userDbPath, '- preserving existing data')
   }
 
   return userDbPath
@@ -52,8 +57,8 @@ function getPrismaClientPath(): string {
     return join(__dirname, '../../node_modules/.prisma/client')
   }
 
-  // 生产环境：extraResources 中的 prisma-client 目录
-  const extraPrismaPath = join(process.resourcesPath, 'prisma-client')
+  // 生产环境：extraResources 中的 .prisma/client 目录
+  const extraPrismaPath = join(process.resourcesPath, '.prisma', 'client')
   log.info('Prisma client path (extraResources):', extraPrismaPath)
   log.info('index.js exists:', existsSync(join(extraPrismaPath, 'index.js')))
   return extraPrismaPath

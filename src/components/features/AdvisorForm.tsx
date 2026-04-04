@@ -55,7 +55,10 @@ export default function AdvisorForm({ institutionId, advisor, onClose }: Advisor
       if (advisor) await updateAdvisor(advisor.id, data)
       else await addAdvisor(data)
       onClose()
-    } catch (error) { console.error('Failed to save advisor:', error) }
+    } catch (error) {
+      console.error('Failed to save advisor:', error)
+      alert('保存失败：' + (error as Error).message)
+    }
     finally { setIsSubmitting(false) }
   }
 

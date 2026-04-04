@@ -28,7 +28,10 @@ export default function TaskForm({ institutionId, task, onClose }: TaskFormProps
       if (task) await updateTask(task.id, data)
       else await addTask(data)
       onClose()
-    } catch (error) { console.error('Failed to save task:', error) }
+    } catch (error) {
+      console.error('Failed to save task:', error)
+      alert('保存失败：' + (error as Error).message)
+    }
     finally { setIsSubmitting(false) }
   }
 

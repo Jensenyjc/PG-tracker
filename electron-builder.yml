@@ -1,19 +1,40 @@
 appId: com.pg-tracker.app
 productName: PG-Tracker
+
 directories:
   buildResources: build
   output: release
+
 files:
   - out/**/*
-  - prisma/**/*
+  - package.json
+
+extraResources:
+  - from: prisma
+    to: prisma
+  - from: node_modules/.prisma/client
+    to: .prisma/client
+  - from: node_modules/@prisma/engines
+    to: node_modules/@prisma/engines
+
+asar: true
+asarUnpack:
+  - "**/*.node"
+  - "**/node_modules/.prisma/**"
+  - "**/node_modules/@prisma/engines/**"
+
 win:
   target:
-    - target: portable
+    - target: nsis
       arch:
         - x64
+  artifactName: ${productName}-${version}-win-setup.${ext}
+  signAndEditExecutable: false
+
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
-portable:
-  artifactName: ${productName}-${version}-portable.${ext}
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: PG-Tracker

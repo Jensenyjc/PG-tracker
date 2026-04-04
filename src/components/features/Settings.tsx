@@ -1,11 +1,18 @@
-import { useState } from 'react'
 import { Moon, Sun, Monitor, Database, Download, Upload, Trash2 } from 'lucide-react'
+import { useTheme } from 'next-themes'
+import { useEffect, useState } from 'react'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Label } from '../ui/label'
 
 export default function Settings(): JSX.Element {
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system')
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  // 避免水合不匹配
+  useEffect(() => { setMounted(true) }, [])
+
+  if (!mounted) return null
 
   const handleExportData = async (): Promise<void> => {
     try {

@@ -10,62 +10,9 @@
     "preview": "electron-vite preview",
     "postinstall": "prisma generate && electron-builder install-app-deps",
     "prisma:generate": "prisma generate",
-    "build:win": "npm run build && npm run prisma:generate && electron-builder --win dir",
+    "build:win": "npm run build && npm run prisma:generate && electron-builder --win nsis",
     "build:mac": "npm run build && npm run prisma:generate && electron-builder --mac",
     "build:linux": "npm run build && npm run prisma:generate && electron-builder --linux"
-  },
-  "build": {
-    "appId": "com.pg-tracker.app",
-    "productName": "PG-Tracker",
-    "asar": true,
-    "asarUnpack": [
-      "**/node_modules/@prisma/engines/**",
-      "**/node_modules/.prisma/**",
-      "**/*.node"
-    ],
-    "directories": {
-      "buildResources": "build",
-      "output": "release"
-    },
-    "files": [
-      "out/**/*",
-      "prisma/**/*",
-      "node_modules/@prisma/client/**/*",
-      "node_modules/.prisma/**/*",
-      "node_modules/@prisma/engines/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "prisma",
-        "to": "prisma"
-      },
-      {
-        "from": "node_modules/.prisma",
-        "to": ".prisma"
-      },
-      {
-        "from": "node_modules/@prisma/engines",
-        "to": "node_modules/@prisma/engines"
-      }
-    ],
-    "win": {
-      "target": "nsis",
-      "artifactName": "${productName}-Setup-${version}.${ext}",
-      "signAndEditExecutable": false
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "PG-Tracker"
-    },
-    "mac": {
-      "target": "dir"
-    },
-    "linux": {
-      "target": "dir"
-    }
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -81,6 +28,7 @@
     "date-fns": "^4.1.0",
     "electron-log": "^5.2.0",
     "lucide-react": "^0.460.0",
+    "next-themes": "^0.4.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "shelljs": "^0.8.5",

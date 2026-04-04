@@ -28,7 +28,10 @@ export default function InterviewForm({ advisorId, onClose }: InterviewFormProps
     try {
       await addInterview({ advisorId, date: formData.date, format: formData.format, markdownNotes: formData.markdownNotes })
       onClose()
-    } catch (error) { console.error('Failed to save interview:', error) }
+    } catch (error) {
+      console.error('Failed to save interview:', error)
+      alert('保存失败：' + (error as Error).message)
+    }
     finally { setIsSubmitting(false) }
   }
 

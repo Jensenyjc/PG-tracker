@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useStore } from './stores/appStore'
+import ThemeProvider from './components/ThemeProvider'
 import Sidebar from './components/layout/Sidebar'
 import KanbanBoard from './components/features/KanbanBoard'
 import InstitutionDetail from './components/features/InstitutionDetail'
@@ -49,6 +50,7 @@ function App(): JSX.Element {
   }
 
   return (
+    <ThemeProvider>
     <div className="flex h-screen bg-background">
       <Sidebar
         currentView={currentView}
@@ -59,6 +61,7 @@ function App(): JSX.Element {
         {renderContent()}
       </main>
     </div>
+    </ThemeProvider>
   )
 }
 
