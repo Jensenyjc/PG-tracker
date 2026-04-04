@@ -1,5 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { electronAPI } from '@electron-toolkit/preload'
+
+// Electron API exposed to renderer
+const electronAPI = {
+  platform: process.platform
+}
 
 const api = {
   institution: {

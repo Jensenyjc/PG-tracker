@@ -1,6 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import log from 'electron-log'
 import { PrismaClient } from '@prisma/client'
 import { exec } from 'child_process'
@@ -14,6 +13,27 @@ const prisma = new PrismaClient()
 // Setup logging
 log.transports.file.level = 'info'
 log.info('Application starting...')
+
+// Custom is object
+const is = {
+  dev: !app.isPackaged
+}
+
+// Platform shortcuts optimizer
+function watchWindowShortcuts(window: BrowserWindow): void {
+  window.webContents.on('before-input-event', (_, input) => {
+    if (input.type === 'keyDown') {
+      if (!is.dev) {
+        if (input.code === 'KeyR' && (input.control || input.meta)) {
+          event.preventDefault()
+        }
+        if (input.code === 'KeyI' && (input.alt && input.meta || input.control && input.shift)) {
+          event.preventDefault()
+        }
+      }
+    }
+  })
+}
 
 let mainWindow: BrowserWindow | null = null
 
@@ -394,10 +414,10 @@ ipcMain.handle('advisor:getConflictWarnings', async (_, institutionId: string) =
 
 // App lifecycle
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.pg-tracker.app')
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
+  // Set app user model id for windows
+  if (process.platform === 'win32' || process.platform === 'darwin') {
+    app.setAppUserModelId('com.pg-tracker.app')
+  }
 
   prisma.$connect().then(() => {
     log.info('Database connected')

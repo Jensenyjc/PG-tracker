@@ -52,9 +52,7 @@
     "zustand": "^5.0.1"
   },
   "devDependencies": {
-    "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/tsconfig": "^1.0.1",
-    "@electron-toolkit/utils": "^3.0.0",
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
