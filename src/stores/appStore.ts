@@ -61,6 +61,7 @@ interface AppState {
   currentView: View
   selectedInstitutionId: string | null
   institutions: Institution[]
+  orphanTasks: Task[]
   isLoading: boolean
   error: string | null
   conflictWarnings: string[]
@@ -68,13 +69,14 @@ interface AppState {
   setView: (view: View) => void
   setSelectedInstitutionId: (id: string | null) => void
   loadInstitutions: () => Promise<void>
+  loadOrphanTasks: () => Promise<void>
   addInstitution: (data: Omit<Institution, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Institution>
   updateInstitution: (id: string, data: Partial<Institution>) => Promise<void>
   deleteInstitution: (id: string) => Promise<void>
   addAdvisor: (data: Omit<Advisor, 'id'>) => Promise<Advisor>
   updateAdvisor: (id: string, data: Partial<Advisor>) => Promise<void>
   deleteAdvisor: (id: string) => Promise<void>
-  addTask: (data: Omit<Task, 'id'>) => Promise<Task>
+  addTask: (data: { institutionId?: string; title: string; dueDate: Date; isCompleted: boolean }) => Promise<Task>
   updateTask: (id: string, data: Partial<Task>) => Promise<void>
   deleteTask: (id: string) => Promise<void>
   addAsset: (data: Omit<Asset, 'id'>) => Promise<Asset>
@@ -96,6 +98,7 @@ export const useStore = create<AppState>((set, get) => ({
   currentView: 'kanban',
   selectedInstitutionId: null,
   institutions: [],
+  orphanTasks: [],
   isLoading: false,
   error: null,
   conflictWarnings: [],
@@ -111,6 +114,15 @@ export const useStore = create<AppState>((set, get) => ({
       set({ institutions: data, isLoading: false })
     } catch (error: any) {
       set({ error: error.message, isLoading: false })
+    }
+  },
+
+  loadOrphanTasks: async () => {
+    try {
+      const tasks = await window.api.task.getOrphan()
+      set({ orphanTasks: tasks })
+    } catch (error: any) {
+      set({ error: error.message })
     }
   },
 
@@ -192,6 +204,9 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const newTask = await window.api.task.create(data)
       await get().loadInstitutions()
+      if (!data.institutionId) {
+        await get().loadOrphanTasks()
+      }
       return newTask
     } catch (error: any) {
       set({ error: error.message })
@@ -201,7 +216,11 @@ export const useStore = create<AppState>((set, get) => ({
 
   updateTask: async (id, data) => {
     try {
-      await window.api.task.update(id, data)
+      const result = await window.api.task.update(id, data)
+      // handler 现在返回 { success, data, error } 结构
+      if (!result.success) {
+        throw new Error(result.error || '更新任务失败')
+      }
       await get().loadInstitutions()
     } catch (error: any) {
       set({ error: error.message })

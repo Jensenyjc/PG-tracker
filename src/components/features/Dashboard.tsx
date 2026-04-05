@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { format, isPast, differenceInDays } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { Calendar, TrendingUp, Users, CheckCircle2, Clock, ArrowRight, List } from 'lucide-react'
@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 
 export default function Dashboard(): JSX.Element {
-  const { institutions, setView, setSelectedInstitutionId } = useStore()
+  const { institutions, orphanTasks, loadOrphanTasks, setView, setSelectedInstitutionId } = useStore()
+
+  useEffect(() => { loadOrphanTasks() }, [])
 
   const stats = useMemo(() => {
     const total = institutions.length
@@ -35,9 +37,9 @@ export default function Dashboard(): JSX.Element {
     return items.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
   }, [institutions])
 
-  // 所有未完成任务
+  // 所有未完成任务（院校任务 + 独立任务）
   const allPendingTasks = useMemo(() => {
-    const items: { institution: Institution; task: any }[] = []
+    const items: { institution: Institution | null; task: any }[] = []
     for (const inst of institutions) {
       for (const task of inst.tasks || []) {
         if (!task.isCompleted) {
@@ -45,8 +47,14 @@ export default function Dashboard(): JSX.Element {
         }
       }
     }
+    // 合并独立任务（institutionId 为 null 的任务）
+    for (const task of orphanTasks) {
+      if (!task.isCompleted) {
+        items.push({ institution: null, task })
+      }
+    }
     return items.sort((a, b) => new Date(a.task.dueDate).getTime() - new Date(b.task.dueDate).getTime())
-  }, [institutions])
+  }, [institutions, orphanTasks])
 
   return (
     <div className="h-full overflow-auto p-6">
@@ -70,68 +78,72 @@ export default function Dashboard(): JSX.Element {
             <CardTitle className="text-lg font-semibold flex items-center gap-2"><Calendar className="h-5 w-5" />日程总览</CardTitle>
             <Button variant="ghost" size="sm" onClick={() => setView('timeline')}>查看完整时间线 <ArrowRight className="h-4 w-4 ml-1" /></Button>
           </CardHeader>
-          <CardContent className="space-y-4 max-h-[400px] overflow-y-auto">
+          <CardContent className="space-y-4">
+
             {/* 院校截止日期 */}
-            <div>
-              <p className="text-sm font-medium text-muted-foreground mb-2">院校截止日期</p>
-              {allDeadlines.length > 0 ? (
-                <div className="space-y-2">
-                  {allDeadlines.map(({ institution, deadline, type, daysLeft }) => {
-                    const urgency = daysLeft <= 7 ? 'urgent' : daysLeft <= 14 ? 'warning' : 'normal'
-                    return (
-                      <div key={`${institution.id}-${type}`} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => { setSelectedInstitutionId(institution.id); setView('kanban') }}>
-                        <div className="flex items-center gap-3">
-                          <span className={`text-sm font-semibold w-16 ${urgency === 'urgent' ? 'text-red-600' : urgency === 'warning' ? 'text-amber-600' : 'text-muted-foreground'}`}>{daysLeft}天</span>
-                          <div>
-                            <p className="font-medium">{institution.name}</p>
-                            <p className="text-sm text-muted-foreground">{institution.department}</p>
+            <div className="bg-slate-50 dark:bg-slate-800/20 rounded-lg p-4">
+              <p className="text-sm font-medium text-muted-foreground mb-3">院校截止日期</p>
+              <div className="max-h-48 overflow-y-auto scrollbar-thin pr-1">
+                {allDeadlines.length > 0 ? (
+                  <div className="space-y-2">
+                    {allDeadlines.map(({ institution, deadline, type, daysLeft }) => {
+                      const urgency = daysLeft <= 7 ? 'urgent' : daysLeft <= 14 ? 'warning' : 'normal'
+                      return (
+                        <div key={`${institution.id}-${type}`} className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-slate-900/40 hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => { setSelectedInstitutionId(institution.id); setView('kanban') }}>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className={`text-sm font-semibold w-14 flex-shrink-0 text-center rounded bg-slate-100 dark:bg-slate-700 py-0.5 ${urgency === 'urgent' ? 'text-red-600' : urgency === 'warning' ? 'text-amber-600' : 'text-muted-foreground'}`}>{daysLeft}天</span>
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm truncate">{institution.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{institution.department}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                            <UrgencyBadge urgency={urgency} />
+                            <BadgeTier tier={institution.tier} type={type} />
+                            <span className="text-xs text-muted-foreground">{format(new Date(deadline), 'MM/dd', { locale: zhCN })}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <UrgencyBadge urgency={urgency} />
-                          <BadgeTier tier={institution.tier} type={type} />
-                          <span className="text-sm text-muted-foreground">{format(new Date(deadline), 'yyyy/MM/dd', { locale: zhCN })}</span>
-                          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">暂无即将截止的申请</p>
-              )}
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-6">暂无即将截止的申请</p>
+                )}
+              </div>
             </div>
 
             {/* 待办任务 */}
-            <div>
-              <p className="text-sm font-medium text-muted-foreground mb-2">待办任务</p>
-              {allPendingTasks.length > 0 ? (
-                <div className="space-y-2">
-                  {allPendingTasks.map(({ institution, task }) => {
-                    const daysLeft = differenceInDays(new Date(task.dueDate), new Date())
-                    const urgency = daysLeft <= 7 ? 'urgent' : daysLeft <= 14 ? 'warning' : 'normal'
-                    return (
-                      <div key={task.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => { setSelectedInstitutionId(institution.id); setView('kanban') }}>
-                        <div className="flex items-center gap-3">
-                          <span className={`text-sm font-semibold w-16 ${urgency === 'urgent' ? 'text-red-600' : urgency === 'warning' ? 'text-amber-600' : 'text-muted-foreground'}`}>{daysLeft}天</span>
-                          <div>
-                            <p className="font-medium">{task.title}</p>
-                            <p className="text-sm text-muted-foreground">{institution.name}</p>
+            <div className="bg-slate-50 dark:bg-slate-800/20 rounded-lg p-4">
+              <p className="text-sm font-medium text-muted-foreground mb-3">待办任务</p>
+              <div className="max-h-48 overflow-y-auto scrollbar-thin pr-1">
+                {allPendingTasks.length > 0 ? (
+                  <div className="space-y-2">
+                    {allPendingTasks.map(({ institution, task }) => {
+                      const daysLeft = differenceInDays(new Date(task.dueDate), new Date())
+                      const urgency = daysLeft <= 7 ? 'urgent' : daysLeft <= 14 ? 'warning' : 'normal'
+                      return (
+                        <div key={task.id} className={`flex items-center justify-between p-3 rounded-lg bg-white dark:bg-slate-900/40 hover:bg-muted/50 transition-colors ${institution ? 'cursor-pointer' : ''}`} onClick={() => { if (institution) { setSelectedInstitutionId(institution.id); setView('kanban') } }}>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className={`text-sm font-semibold w-14 flex-shrink-0 text-center rounded bg-slate-100 dark:bg-slate-700 py-0.5 ${urgency === 'urgent' ? 'text-red-600' : urgency === 'warning' ? 'text-amber-600' : 'text-muted-foreground'}`}>{daysLeft}天</span>
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm truncate">{task.title}</p>
+                              <p className="text-xs text-muted-foreground truncate">{institution ? `${institution.name} · ${institution.department}` : '无关联院校'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                            <UrgencyBadge urgency={urgency} />
+                            <span className="text-xs text-muted-foreground">{format(new Date(task.dueDate), 'MM/dd', { locale: zhCN })}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <UrgencyBadge urgency={urgency} />
-                          <span className="text-sm text-muted-foreground">{format(new Date(task.dueDate), 'yyyy/MM/dd', { locale: zhCN })}</span>
-                          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">暂无待办任务</p>
-              )}
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-6">暂无待办任务</p>
+                )}
+              </div>
             </div>
+
           </CardContent>
         </Card>
 

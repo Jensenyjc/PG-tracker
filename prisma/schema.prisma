@@ -47,12 +47,12 @@ model Advisor {
 }
 
 model Task {
-  id              String      @id @default(uuid())
-  institutionId   String
-  institution     Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  id              String       @id @default(uuid())
+  institutionId   String?
+  institution     Institution? @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   title           String
   dueDate         DateTime
-  isCompleted     Boolean     @default(false)
+  isCompleted     Boolean      @default(false)
   createdAt       DateTime    @default(now())
 }
 

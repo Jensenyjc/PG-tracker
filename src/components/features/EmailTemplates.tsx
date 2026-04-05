@@ -106,6 +106,7 @@ export default function EmailTemplates(): JSX.Element {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch { return {} }
   })
   const [copied, setCopied] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const initRef = useRef(false)
@@ -220,15 +221,20 @@ export default function EmailTemplates(): JSX.Element {
   }, [editedContent, editedSubject, fillValues])
 
   const handleAddTemplate = async (): Promise<void> => {
-    if (!newTemplateName.trim()) return
-    const result = await createEmailTemplate({ name: newTemplateName.trim(), subject: '邮件主题', content: '邮件内容...' })
-    await loadEmailTemplates()
-    if (result && result.id) {
-      const created = useStore.getState().emailTemplates.find((t: any) => t.id === result.id)
-      if (created) handleSelectTemplate(created)
+    if (!newTemplateName.trim() || isCreating) return
+    setIsCreating(true)
+    try {
+      const result = await createEmailTemplate({ name: newTemplateName.trim(), subject: '邮件主题', content: '邮件内容...' })
+      await loadEmailTemplates()
+      if (result && result.id) {
+        const created = useStore.getState().emailTemplates.find((t: any) => t.id === result.id)
+        if (created) handleSelectTemplate(created)
+      }
+      setNewTemplateName('')
+      setShowAddTemplate(false)
+    } finally {
+      setIsCreating(false)
     }
-    setNewTemplateName('')
-    setShowAddTemplate(false)
   }
 
   const handleDeleteTemplate = async (templateId: string): Promise<void> => {
@@ -275,7 +281,7 @@ export default function EmailTemplates(): JSX.Element {
                   onKeyDown={e => e.key === 'Enter' && handleAddTemplate()}
                   autoFocus className="text-sm h-8" />
                 <div className="flex gap-1">
-                  <Button size="sm" className="flex-1 h-7 text-xs" onClick={handleAddTemplate}><Plus className="h-3 w-3 mr-1" />创建</Button>
+                  <Button size="sm" className="flex-1 h-7 text-xs" onClick={handleAddTemplate} disabled={isCreating}><Plus className="h-3 w-3 mr-1" />{isCreating ? '创建中...' : '创建'}</Button>
                   <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setShowAddTemplate(false); setNewTemplateName('') }}><X className="h-3 w-3" /></Button>
                 </div>
               </div>

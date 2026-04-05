@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join, dirname } from 'path'
-import { existsSync, copyFileSync, mkdirSync } from 'fs'
+import { existsSync, copyFileSync, unlinkSync } from 'fs'
 import log from 'electron-log'
 import { exec } from 'child_process'
 import { promisify } from 'util'
@@ -15,36 +15,45 @@ const platform = process.platform || 'win32'
 let prisma: any = null
 
 /**
- * 获取数据库路径。
- * 开发环境：项目根目录 prisma/dev.db
- * 生产环境：userData 目录（可写），首次运行时从 extraResources 复制
+ * 数据库初始化主函数。
+ * 每次启动时检测用户数据库的 schema 版本，如果缺少 EmailTemplate 表，
+ * 说明是旧版本安装后覆盖安装的场景，强制用安装包里的最新数据库替换。
  */
-function getDatabasePath(): string {
+async function initializeDatabase(): Promise<string> {
   if (isDev) {
+    log.info('[Dev] Using local dev database at:', join(__dirname, '../../prisma/dev.db'))
     return join(__dirname, '../../prisma/dev.db')
   }
 
-  // 生产环境：使用 userData 目录（可写，不在 asar 内）
   const userDataPath = app.getPath('userData')
   const userDbPath = join(userDataPath, 'dev.db')
+  const resourceDbPath = join(process.resourcesPath, 'prisma', 'dev.db')
 
-  // 如果 userData 中没有 db 文件，从 extraResources 复制一份作为初始数据库
-  // 注意：只有首次安装时才复制，之后用户数据会保留在 userData 中
   if (!existsSync(userDbPath)) {
-    const resourceDbPath = join(process.resourcesPath, 'prisma', 'dev.db')
-    log.info('First run detected: copying seed database from resources to userData:', resourceDbPath, '->', userDbPath)
+    // 首次安装
     if (existsSync(resourceDbPath)) {
       copyFileSync(resourceDbPath, userDbPath)
-    } else {
-      log.warn('No seed database found at:', resourceDbPath)
-      // 如果连 seed 都没有，创建一个空数据库文件
-      // Prisma 会在首次连接时自动创建表结构
+      log.info('[Prod] First run: copied seed database from resources')
     }
-  } else {
-    log.info('User database found at:', userDbPath, '- preserving existing data')
+    return userDbPath
   }
 
-  return userDbPath
+  // 覆盖安装场景：检测 EmailTemplate 表是否存在于用户数据库
+  try {
+    const client = await getPrisma()
+    await client.emailTemplate.findFirst({ select: { id: true } })
+    log.info('[Prod] User database schema is up to date')
+    return userDbPath
+  } catch (err: any) {
+    // 表不存在，说明是旧版本覆盖安装
+    log.warn('[Prod] User database schema is outdated. Replacing with fresh database from resources.', err?.message)
+    try { unlinkSync(userDbPath) } catch {}
+    if (existsSync(resourceDbPath)) {
+      copyFileSync(resourceDbPath, userDbPath)
+      log.info('[Prod] Database replaced successfully')
+    }
+    return userDbPath
+  }
 }
 
 /**
@@ -67,34 +76,22 @@ function getPrismaClientPath(): string {
 async function getPrisma(): Promise<any> {
   if (!prisma) {
     const prismaPath = getPrismaClientPath()
-    const dbPath = getDatabasePath()
-
-    log.info('=== Prisma Init ===')
-    log.info('  Prisma Client path:', prismaPath)
-    log.info('  Database path:', dbPath)
-    log.info('  app.isPackaged:', app.isPackaged)
-    log.info('  process.resourcesPath:', process.resourcesPath)
 
     // 验证关键文件存在
     const engineFile = join(prismaPath, 'query_engine-windows.dll.node')
-    const schemaFile = join(prismaPath, 'schema.prisma')
+    log.info('=== Prisma Init ===')
+    log.info('  Prisma Client path:', prismaPath)
+    log.info('  Database URL:', process.env.DATABASE_URL)
+    log.info('  app.isPackaged:', app.isPackaged)
     log.info('  query engine exists:', existsSync(engineFile))
-    log.info('  schema.prisma exists:', existsSync(schemaFile))
 
-    // 告诉 Prisma 引擎的确切位置（生产环境必需）
     if (!isDev) {
       process.env.PRISMA_QUERY_ENGINE_LIBRARY = engineFile
     }
 
     try {
       const { PrismaClient } = require(prismaPath)
-      prisma = new PrismaClient({
-        datasources: {
-          db: {
-            url: `file:${dbPath}`
-          }
-        }
-      })
+      prisma = new PrismaClient()
     } catch (err) {
       log.error('Failed to load Prisma Client:', err)
       throw err
@@ -318,12 +315,25 @@ ipcMain.handle('task:getByInstitution', async (_, institutionId: string) => {
   }
 })
 
+ipcMain.handle('task:getOrphan', async () => {
+  try {
+    const client = await getPrisma()
+    return await client.task.findMany({
+      where: { institutionId: null },
+      orderBy: { dueDate: 'asc' }
+    })
+  } catch (error) {
+    log.error('Error fetching orphan tasks:', error)
+    throw error
+  }
+})
+
 ipcMain.handle('task:create', async (_, data: any) => {
   try {
     const client = await getPrisma()
     return await client.task.create({
       data: {
-        institutionId: data.institutionId,
+        institutionId: data.institutionId || null,
         title: data.title,
         dueDate: new Date(data.dueDate),
         isCompleted: false
@@ -338,17 +348,35 @@ ipcMain.handle('task:create', async (_, data: any) => {
 ipcMain.handle('task:update', async (_, id: string, data: any) => {
   try {
     const client = await getPrisma()
-    return await client.task.update({
-      where: { id },
-      data: {
-        title: data.title,
-        dueDate: new Date(data.dueDate),
-        isCompleted: data.isCompleted
+
+    // 动态构建局部更新对象，只包含明确传递的字段
+    const updateData: Record<string, any> = {}
+
+    if (data.title !== undefined) {
+      updateData.title = data.title
+    }
+
+    if (data.dueDate !== undefined) {
+      if (data.dueDate === null || data.dueDate === '') {
+        updateData.dueDate = null
+      } else {
+        const parsedDate = new Date(data.dueDate)
+        if (isNaN(parsedDate.getTime())) {
+          return { success: false, data: null, error: '传递的 dueDate 格式不正确' }
+        }
+        updateData.dueDate = parsedDate
       }
-    })
-  } catch (error) {
+    }
+
+    if (data.isCompleted !== undefined) {
+      updateData.isCompleted = data.isCompleted
+    }
+
+    const result = await client.task.update({ where: { id }, data: updateData })
+    return { success: true, data: result, error: null }
+  } catch (error: any) {
     log.error('Error updating task:', error)
-    throw error
+    return { success: false, data: null, error: error.message }
   }
 })
 
@@ -613,18 +641,21 @@ ipcMain.handle('advisor:getConflictWarnings', async (_, institutionId: string) =
 
 // App lifecycle
 app.whenReady().then(async () => {
-  // Set app user model id for windows
   if (platform === 'win32') {
     app.setAppUserModelId('com.pg-tracker.app')
   }
 
-  // Initialize Prisma
+  // 初始化数据库（检测 schema 版本，必要时热替换）
   try {
+    const dbPath = await initializeDatabase()
+    process.env.DATABASE_URL = `file:${dbPath}`
+    log.info('Database initialized at:', dbPath)
+
     const client = await getPrisma()
     await client.$connect()
     log.info('Database connected successfully')
   } catch (error) {
-    log.error('Database connection failed:', error)
+    log.error('Database initialization failed:', error)
   }
 
   createWindow()

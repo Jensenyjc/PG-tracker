@@ -22,6 +22,7 @@ const api = {
   },
   task: {
     getByInstitution: (institutionId: string) => ipcRenderer.invoke('task:getByInstitution', institutionId),
+    getOrphan: () => ipcRenderer.invoke('task:getOrphan'),
     create: (data: any) => ipcRenderer.invoke('task:create', data),
     update: (id: string, data: any) => ipcRenderer.invoke('task:update', id, data),
     delete: (id: string) => ipcRenderer.invoke('task:delete', id)

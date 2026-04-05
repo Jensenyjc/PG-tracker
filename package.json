@@ -1,6 +1,6 @@
 {
   "name": "pg-tracker",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "保研信息收集与决策分析系统",
   "author": "Your Name",
   "main": "./out/main/index.js",
@@ -23,6 +23,7 @@
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-tabs": "^1.1.1",
     "@radix-ui/react-tooltip": "^1.1.3",
+    "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
