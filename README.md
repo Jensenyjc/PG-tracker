@@ -5,7 +5,7 @@
 一款专为中国大学生设计的保研申请管理桌面应用，帮助你系统化管理目标院校、导师信息、申请进度和面试记录，所有数据完全本地存储，保护隐私。
 
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
 ![Electron](https://img.shields.io/badge/Electron-33.2.0-47848F)
 ![React](https://img.shields.io/badge/React-18.3-61DAFB)
 

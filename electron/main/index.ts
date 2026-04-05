@@ -483,6 +483,113 @@ ipcMain.handle('file:compileLatex', async (_, texPath: string) => {
 
 // ============== Conflict Detection ==============
 
+// ============== EmailTemplate CRUD ==============
+
+ipcMain.handle('emailTemplate:getAll', async () => {
+  try {
+    const client = await getPrisma()
+    const templates = await client.emailTemplate.findMany({
+      include: { variables: true },
+      orderBy: { createdAt: 'asc' }
+    })
+    return { success: true, data: templates }
+  } catch (error: any) {
+    log.error('Error fetching email templates:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('emailTemplate:create', async (_, data: any) => {
+  try {
+    const client = await getPrisma()
+    const template = await client.emailTemplate.create({
+      data: {
+        name: data.name,
+        subject: data.subject,
+        content: data.content
+      }
+    })
+    return { success: true, data: template }
+  } catch (error: any) {
+    log.error('Error creating email template:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('emailTemplate:update', async (_, id: string, data: any) => {
+  try {
+    const client = await getPrisma()
+    const template = await client.emailTemplate.update({
+      where: { id },
+      data: {
+        name: data.name,
+        subject: data.subject,
+        content: data.content
+      },
+      include: { variables: true }
+    })
+    return { success: true, data: template }
+  } catch (error: any) {
+    log.error('Error updating email template:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('emailTemplate:delete', async (_, id: string) => {
+  try {
+    const client = await getPrisma()
+    await client.emailTemplate.delete({ where: { id } })
+    return { success: true }
+  } catch (error: any) {
+    log.error('Error deleting email template:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+// ============== EmailVariable CRUD ==============
+
+ipcMain.handle('emailVariable:getByTemplate', async (_, templateId: string) => {
+  try {
+    const client = await getPrisma()
+    const variables = await client.emailVariable.findMany({
+      where: { templateId }
+    })
+    return { success: true, data: variables }
+  } catch (error: any) {
+    log.error('Error fetching email variables:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('emailVariable:create', async (_, data: any) => {
+  try {
+    const client = await getPrisma()
+    const variable = await client.emailVariable.create({
+      data: {
+        name: data.name,
+        templateId: data.templateId
+      }
+    })
+    return { success: true, data: variable }
+  } catch (error: any) {
+    log.error('Error creating email variable:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('emailVariable:delete', async (_, id: string) => {
+  try {
+    const client = await getPrisma()
+    await client.emailVariable.delete({ where: { id } })
+    return { success: true }
+  } catch (error: any) {
+    log.error('Error deleting email variable:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+// ============== Conflict Detection ==============
+
 ipcMain.handle('advisor:getConflictWarnings', async (_, institutionId: string) => {
   try {
     const client = await getPrisma()

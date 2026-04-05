@@ -55,11 +55,18 @@ export interface Interview {
   markdownNotes: string
 }
 
+type View = 'dashboard' | 'kanban' | 'timeline' | 'templates' | 'settings'
+
 interface AppState {
+  currentView: View
+  selectedInstitutionId: string | null
   institutions: Institution[]
   isLoading: boolean
   error: string | null
   conflictWarnings: string[]
+  emailTemplates: any[]
+  setView: (view: View) => void
+  setSelectedInstitutionId: (id: string | null) => void
   loadInstitutions: () => Promise<void>
   addInstitution: (data: Omit<Institution, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Institution>
   updateInstitution: (id: string, data: Partial<Institution>) => Promise<void>
@@ -77,13 +84,25 @@ interface AppState {
   deleteInterview: (id: string) => Promise<void>
   checkConflicts: (institutionId: string) => Promise<void>
   clearError: () => void
+  loadEmailTemplates: () => Promise<void>
+  createEmailTemplate: (data: { name: string; subject: string; content: string }) => Promise<any>
+  updateEmailTemplate: (id: string, data: { name: string; subject: string; content: string }) => Promise<any>
+  deleteEmailTemplate: (id: string) => Promise<void>
+  createEmailVariable: (data: { name: string; templateId: string }) => Promise<any>
+  deleteEmailVariable: (id: string) => Promise<void>
 }
 
 export const useStore = create<AppState>((set, get) => ({
+  currentView: 'kanban',
+  selectedInstitutionId: null,
   institutions: [],
   isLoading: false,
   error: null,
   conflictWarnings: [],
+  emailTemplates: [],
+
+  setView: (view) => set({ currentView: view }),
+  setSelectedInstitutionId: (id) => set({ selectedInstitutionId: id }),
 
   loadInstitutions: async () => {
     set({ isLoading: true, error: null })
@@ -257,5 +276,92 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  clearError: () => set({ error: null })
+  clearError: () => set({ error: null }),
+
+  loadEmailTemplates: async () => {
+    try {
+      const result = await window.api.emailTemplate.getAll()
+      if (!result.success) {
+        set({ error: result.error })
+        return
+      }
+      // data is the array of templates with their variables
+      set({ emailTemplates: result.data })
+    } catch (error: any) {
+      set({ error: error.message })
+    }
+  },
+
+  createEmailTemplate: async (data) => {
+    try {
+      const result = await window.api.emailTemplate.create(data)
+      if (!result.success) {
+        set({ error: result.error })
+        throw new Error(result.error)
+      }
+      await get().loadEmailTemplates()
+      return result.data
+    } catch (error: any) {
+      set({ error: error.message })
+      throw error
+    }
+  },
+
+  updateEmailTemplate: async (id, data) => {
+    try {
+      const result = await window.api.emailTemplate.update(id, data)
+      if (!result.success) {
+        set({ error: result.error })
+        throw new Error(result.error)
+      }
+      await get().loadEmailTemplates()
+      return result.data
+    } catch (error: any) {
+      set({ error: error.message })
+      throw error
+    }
+  },
+
+  deleteEmailTemplate: async (id) => {
+    try {
+      const result = await window.api.emailTemplate.delete(id)
+      if (!result.success) {
+        set({ error: result.error })
+        throw new Error(result.error)
+      }
+      await get().loadEmailTemplates()
+    } catch (error: any) {
+      set({ error: error.message })
+      throw error
+    }
+  },
+
+  createEmailVariable: async (data) => {
+    try {
+      const result = await window.api.emailVariable.create(data)
+      if (!result.success) {
+        set({ error: result.error })
+        throw new Error(result.error)
+      }
+      await get().loadEmailTemplates()
+      return result.data
+    } catch (error: any) {
+      set({ error: error.message })
+      throw error
+    }
+  },
+
+  deleteEmailVariable: async (id) => {
+    try {
+      const result = await window.api.emailVariable.delete(id)
+      if (!result.success) {
+        set({ error: result.error })
+        throw new Error(result.error)
+      }
+      await get().loadEmailTemplates()
+    } catch (error: any) {
+      set({ error: error.message })
+      throw error
+    }
+  }
 }))

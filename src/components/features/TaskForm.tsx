@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { format } from 'date-fns'
 import { useStore, Task } from '../../stores/appStore'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -11,11 +12,21 @@ interface TaskFormProps {
   onClose: () => void
 }
 
+function toDateInputValue(value: string | Date | null | undefined): string {
+  if (!value) return ''
+  if (typeof value === 'string') {
+    // 已经是 ISO 字符串如 "2025-06-15" 或 "2025-06-15T00:00:00.000Z"
+    return value.substring(0, 10)
+  }
+  // Date 对象
+  return format(new Date(value), 'yyyy-MM-dd')
+}
+
 export default function TaskForm({ institutionId, task, onClose }: TaskFormProps): JSX.Element {
   const { addTask, updateTask } = useStore()
   const [formData, setFormData] = useState({
     title: task?.title || '',
-    dueDate: task?.dueDate ? task.dueDate.split('T')[0] : ''
+    dueDate: toDateInputValue(task?.dueDate)
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 

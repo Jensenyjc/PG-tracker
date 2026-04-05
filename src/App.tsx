@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useStore } from './stores/appStore'
 import ThemeProvider from './components/ThemeProvider'
 import Sidebar from './components/layout/Sidebar'
@@ -9,12 +9,8 @@ import EmailTemplates from './components/features/EmailTemplates'
 import Settings from './components/features/Settings'
 import Dashboard from './components/features/Dashboard'
 
-type View = 'dashboard' | 'kanban' | 'timeline' | 'templates' | 'settings'
-
 function App(): JSX.Element {
-  const [currentView, setCurrentView] = useState<View>('kanban')
-  const [selectedInstitutionId, setSelectedInstitutionId] = useState<string | null>(null)
-  const { loadInstitutions, institutions } = useStore()
+  const { currentView, selectedInstitutionId, setView, setSelectedInstitutionId, loadInstitutions, institutions } = useStore()
 
   useEffect(() => {
     loadInstitutions()
@@ -22,21 +18,27 @@ function App(): JSX.Element {
 
   const handleSelectInstitution = (id: string | null): void => {
     setSelectedInstitutionId(id)
-    if (id) setCurrentView('kanban')
+    if (id) setView('kanban')
   }
 
   const handleBackToKanban = (): void => {
     setSelectedInstitutionId(null)
+    setView('kanban')
   }
 
   const renderContent = (): JSX.Element => {
     if (selectedInstitutionId) {
-      return <InstitutionDetail institutionId={selectedInstitutionId} onBack={handleBackToKanban} />
+      const exists = institutions.some((i) => i.id === selectedInstitutionId)
+      if (exists) {
+        return <InstitutionDetail institutionId={selectedInstitutionId} onBack={handleBackToKanban} />
+      }
+      // institution not loaded yet, show kanban
+      return <KanbanBoard onSelectInstitution={handleSelectInstitution} />
     }
 
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard onSelectInstitution={handleSelectInstitution} />
+        return <Dashboard />
       case 'timeline':
         return <Timeline institutions={institutions} />
       case 'templates':
@@ -54,7 +56,7 @@ function App(): JSX.Element {
     <div className="flex h-screen bg-background">
       <Sidebar
         currentView={currentView}
-        onViewChange={setCurrentView}
+        onViewChange={setView}
         onSelectInstitution={handleSelectInstitution}
       />
       <main className="flex-1 overflow-hidden">

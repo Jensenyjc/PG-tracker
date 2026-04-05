@@ -30,6 +30,14 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
 
   const institution = institutions.find((i) => i.id === institutionId)
 
+  if (!institution) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <p className="text-muted-foreground">院校信息加载中...</p>
+      </div>
+    )
+  }
+
   useEffect(() => {
     if (institutionId) checkConflicts(institutionId)
   }, [institutionId, checkConflicts])
@@ -146,8 +154,8 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
             {institution.advisors && institution.advisors.length > 0 && (
               <section>
                 <h3 className="text-lg font-semibold mb-3">导师预览</h3>
-                <div className="space-y-2">
-                  {institution.advisors.slice(0, 3).map((advisor) => (
+                <div className="max-h-[300px] overflow-y-auto space-y-2">
+                  {institution.advisors.map((advisor) => (
                     <div key={advisor.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                       <div>
                         <p className="font-medium">{advisor.name}</p>
@@ -158,9 +166,6 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
                       </Badge>
                     </div>
                   ))}
-                  {institution.advisors.length > 3 && (
-                    <p className="text-sm text-muted-foreground text-center">还有 {institution.advisors.length - 3} 位导师...</p>
-                  )}
                 </div>
               </section>
             )}

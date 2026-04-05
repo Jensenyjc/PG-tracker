@@ -1,14 +1,15 @@
 import { useMemo } from 'react'
 import { format, isPast, isToday, isTomorrow, isThisWeek } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
-import { Calendar, Clock, AlertCircle, CheckCircle2 } from 'lucide-react'
-import { Institution } from '../../stores/appStore'
+import { Calendar, Clock, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react'
+import { Institution, useStore } from '../../stores/appStore'
 
 interface TimelineProps {
   institutions: Institution[]
 }
 
 export default function Timeline({ institutions }: TimelineProps): JSX.Element {
+  const { setSelectedInstitutionId, setView } = useStore()
   const timelineEvents = useMemo(() => {
     const events: Array<{ id: string; title: string; type: 'camp' | 'push' | 'task'; date: string; institution: Institution; completed?: boolean }> = []
     institutions.forEach((inst) => {
@@ -69,7 +70,11 @@ export default function Timeline({ institutions }: TimelineProps): JSX.Element {
                     {events.map((event) => {
                       const dateInfo = getDateLabel(event.date)
                       return (
-                        <div key={event.id} className={`flex items-center gap-4 p-4 rounded-lg border ${event.completed ? 'bg-muted/30 opacity-60' : 'bg-card'}`}>
+                        <div
+                          key={event.id}
+                          className={`flex items-center gap-4 p-4 rounded-lg border cursor-pointer hover:bg-muted/30 transition-colors ${event.completed ? 'bg-muted/30 opacity-60' : 'bg-card'}`}
+                          onClick={() => { setSelectedInstitutionId(event.institution.id); setView('kanban') }}
+                        >
                           <div className="flex items-center gap-3 w-32">
                             {event.completed ? (
                               <CheckCircle2 className="h-5 w-5 text-green-600" />
@@ -81,7 +86,10 @@ export default function Timeline({ institutions }: TimelineProps): JSX.Element {
                             <p className={`font-medium ${event.completed ? 'line-through' : ''}`}>{event.title}</p>
                             <p className="text-sm text-muted-foreground">{event.institution.name} · {event.institution.department}</p>
                           </div>
-                          <div className="text-sm text-muted-foreground">{format(new Date(event.date), 'yyyy/MM/dd', { locale: zhCN })}</div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-sm text-muted-foreground">{format(new Date(event.date), 'yyyy/MM/dd', { locale: zhCN })}</div>
+                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                          </div>
                         </div>
                       )
                     })}
