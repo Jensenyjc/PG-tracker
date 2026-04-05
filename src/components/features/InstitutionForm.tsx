@@ -13,33 +13,31 @@ interface InstitutionFormProps {
   onSuccess: () => void
 }
 
-const initialFormData = {
-  name: '',
-  department: '',
-  tier: 'MATCH' as 'REACH' | 'MATCH' | 'SAFETY',
-  degreeType: 'MASTER' as 'MASTER' | 'PHD',
-  campDeadline: '',
-  pushDeadline: '',
-  expectedQuota: undefined as number | undefined,
-  policyTags: [] as string[]
-}
-
 export default function InstitutionForm({ institution, onClose, onSuccess }: InstitutionFormProps): JSX.Element {
   const { addInstitution, updateInstitution } = useStore()
-  const [formData, setFormData] = useState({
-    ...initialFormData,
-    ...(institution
-      ? {
-          name: institution.name,
-          department: institution.department,
-          tier: institution.tier,
-          degreeType: institution.degreeType,
-          campDeadline: institution.campDeadline || '',
-          pushDeadline: institution.pushDeadline || '',
-          expectedQuota: institution.expectedQuota || undefined,
-          policyTags: institution.policyTags ? JSON.parse(institution.policyTags) : []
-        }
-      : initialFormData)
+  const [formData, setFormData] = useState(() => {
+    if (institution) {
+      return {
+        name: institution.name,
+        department: institution.department,
+        tier: institution.tier,
+        degreeType: institution.degreeType,
+        campDeadline: institution.campDeadline || '',
+        pushDeadline: institution.pushDeadline || '',
+        expectedQuota: institution.expectedQuota || undefined,
+        policyTags: institution.policyTags ? JSON.parse(institution.policyTags) : [] as string[]
+      }
+    }
+    return {
+      name: '',
+      department: '',
+      tier: 'MATCH' as 'REACH' | 'MATCH' | 'SAFETY',
+      degreeType: 'MASTER' as 'MASTER' | 'PHD',
+      campDeadline: '',
+      pushDeadline: '',
+      expectedQuota: undefined as number | undefined,
+      policyTags: [] as string[]
+    }
   })
   const [tagInput, setTagInput] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -75,46 +73,54 @@ export default function InstitutionForm({ institution, onClose, onSuccess }: Ins
   const addTag = (): void => {
     const tag = tagInput.trim()
     if (tag && !formData.policyTags.includes(tag)) {
-      setFormData((prev) => ({ ...prev, policyTags: [...prev.policyTags, tag] }))
+      setFormData(prev => ({ ...prev, policyTags: [...prev.policyTags, tag] }))
       setTagInput('')
     }
   }
 
   const removeTag = (tagToRemove: string): void => {
-    setFormData((prev) => ({ ...prev, policyTags: prev.policyTags.filter((t) => t !== tagToRemove) }))
+    setFormData(prev => ({ ...prev, policyTags: prev.policyTags.filter(t => t !== tagToRemove) }))
+  }
+
+  // 关键修复：overlay onPointerDownOutside 阻止关闭，content onClick 正常穿透
+  const handlePointerDownOutside = (e: Event) => {
+    e.preventDefault()
   }
 
   return (
-    <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent
+        onPointerDownOutside={handlePointerDownOutside}
+        className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto"
+      >
         <DialogHeader>
           <DialogTitle>{institution ? '编辑院校' : '添加院校'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <Label htmlFor="name">学校名称 *</Label>
-              <Input id="name" value={formData.name} onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))} placeholder="如：清华大学" required />
+              <Label htmlFor="inst-name">学校名称 *</Label>
+              <Input id="inst-name" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="如：清华大学" required />
             </div>
             <div className="col-span-2">
-              <Label htmlFor="department">院系名称 *</Label>
-              <Input id="department" value={formData.department} onChange={(e) => setFormData((prev) => ({ ...prev, department: e.target.value }))} placeholder="如：计算机科学与技术系" required />
+              <Label htmlFor="inst-dept">院系名称 *</Label>
+              <Input id="inst-dept" value={formData.department} onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))} placeholder="如：计算机科学与技术系" required />
             </div>
             <div>
-              <Label>申请层次</Label>
-              <Select value={formData.tier} onValueChange={(value) => setFormData((prev) => ({ ...prev, tier: value as 'REACH' | 'MATCH' | 'SAFETY' }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Label htmlFor="inst-tier">申请层次</Label>
+              <Select value={formData.tier} onValueChange={(value) => setFormData(prev => ({ ...prev, tier: value as 'REACH' | 'MATCH' | 'SAFETY' }))}>
+                <SelectTrigger id="inst-tier"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="REACH">冲 - 超出自身水平</SelectItem>
-                  <SelectItem value="MATCH">稳 - 匹配自身水平</SelectItem>
-                  <SelectItem value="SAFETY">保 - 保底选择</SelectItem>
+                  <SelectItem value="REACH">冲 — 超出自身水平</SelectItem>
+                  <SelectItem value="MATCH">稳 — 匹配自身水平</SelectItem>
+                  <SelectItem value="SAFETY">保 — 保底选择</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>学位类型</Label>
-              <Select value={formData.degreeType} onValueChange={(value) => setFormData((prev) => ({ ...prev, degreeType: value as 'MASTER' | 'PHD' }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Label htmlFor="inst-degree">学位类型</Label>
+              <Select value={formData.degreeType} onValueChange={(value) => setFormData(prev => ({ ...prev, degreeType: value as 'MASTER' | 'PHD' }))}>
+                <SelectTrigger id="inst-degree"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="MASTER">学硕</SelectItem>
                   <SelectItem value="PHD">直博</SelectItem>
@@ -125,24 +131,24 @@ export default function InstitutionForm({ institution, onClose, onSuccess }: Ins
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="campDeadline">夏令营截止日期</Label>
-              <Input id="campDeadline" type="date" value={formData.campDeadline} onChange={(e) => setFormData((prev) => ({ ...prev, campDeadline: e.target.value }))} />
+              <Label htmlFor="inst-camp">夏令营截止日期</Label>
+              <Input id="inst-camp" type="date" value={formData.campDeadline} onChange={(e) => setFormData(prev => ({ ...prev, campDeadline: e.target.value }))} />
             </div>
             <div>
-              <Label htmlFor="pushDeadline">预推免截止日期</Label>
-              <Input id="pushDeadline" type="date" value={formData.pushDeadline} onChange={(e) => setFormData((prev) => ({ ...prev, pushDeadline: e.target.value }))} />
+              <Label htmlFor="inst-push">预推免截止日期</Label>
+              <Input id="inst-push" type="date" value={formData.pushDeadline} onChange={(e) => setFormData(prev => ({ ...prev, pushDeadline: e.target.value }))} />
             </div>
           </div>
 
           <div>
-            <Label htmlFor="expectedQuota">预计招生名额</Label>
-            <Input id="expectedQuota" type="number" min="0" value={formData.expectedQuota || ''} onChange={(e) => setFormData((prev) => ({ ...prev, expectedQuota: e.target.value ? parseInt(e.target.value) : undefined }))} placeholder="如：10" />
+            <Label htmlFor="inst-quota">预计招生名额</Label>
+            <Input id="inst-quota" type="number" min="0" value={formData.expectedQuota || ''} onChange={(e) => setFormData(prev => ({ ...prev, expectedQuota: e.target.value ? parseInt(e.target.value) : undefined }))} placeholder="如：10" />
           </div>
 
           <div>
             <Label>特殊政策标签</Label>
             <div className="flex gap-2 mt-1.5">
-              <Input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())} placeholder="输入标签后按回车添加" />
+              <Input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }} placeholder="输入标签后按回车添加" />
               <Button type="button" variant="secondary" onClick={addTag}>添加</Button>
             </div>
             {formData.policyTags.length > 0 && (
