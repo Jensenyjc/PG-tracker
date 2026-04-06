@@ -12,7 +12,9 @@
     "prisma:generate": "prisma generate",
     "build:win": "npm run build && npm run prisma:generate && electron-builder --win nsis",
     "build:mac": "npm run build && npm run prisma:generate && electron-builder --mac",
-    "build:linux": "npm run build && npm run prisma:generate && electron-builder --linux"
+    "build:mac-standalone": "npm run build && npm run prisma:generate && electron-builder --config electron-builder-mac.yml",
+    "build:linux": "npm run build && npm run prisma:generate && electron-builder --linux",
+    "build:linux-standalone": "npm run build && npm run prisma:generate && electron-builder --config electron-builder-linux.yml"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
