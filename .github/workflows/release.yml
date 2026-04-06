@@ -12,16 +12,16 @@ jobs:
       matrix:
         include:
           - platform: windows
-            artifact_name: PG-Tracker-2.1.1-win-setup.exe
             build_cmd: npm run build:win
+            config: electron-builder.yml
 
           - platform: macos
-            artifact_name: PG-Tracker-Mac-2.1.1.dmg
             build_cmd: npm run build:mac-standalone
+            config: electron-builder-mac.yml
 
           - platform: linux
-            artifact_name: PG-Tracker-Linux-2.1.1.AppImage
             build_cmd: npm run build:linux-standalone
+            config: electron-builder-linux.yml
 
     runs-on: ${{ matrix.platform }}-latest
     steps:
@@ -39,15 +39,5 @@ jobs:
 
       - name: Build
         run: ${{ matrix.build_cmd }}
-
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v1
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: |
-            release/${{ matrix.artifact_name }}
-            dist-mac/*.zip
-            dist-linux/*.AppImage
-            dist-linux/*.deb
