@@ -19,7 +19,7 @@ jobs:
             build_cmd: npm run build:mac-standalone
             config: electron-builder-mac.yml
 
-          - platform: linux
+          - platform: ubuntu
             build_cmd: npm run build:linux-standalone
             config: electron-builder-linux.yml
 
