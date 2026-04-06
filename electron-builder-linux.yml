@@ -1,0 +1,14 @@
+appId: com.pgtracker.app
+productName: PG-Tracker-Linux
+directories:
+  output: dist-linux
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  category: Education
+  icon: resources/icon.png

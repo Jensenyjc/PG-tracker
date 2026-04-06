@@ -1,0 +1,18 @@
+appId: com.pgtracker.app
+productName: PG-Tracker-Mac
+directories:
+  output: dist-mac
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
+      arch:
+        - x64
+        - arm64
+  category: public.app-category.education
+  gatekeeperAssess: false
+  hardenedRuntime: false
+  identity: null
