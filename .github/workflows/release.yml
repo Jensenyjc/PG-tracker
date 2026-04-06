@@ -41,7 +41,9 @@ jobs:
         run: ${{ matrix.build_cmd }}
 
       - name: Upload to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref_name }}
           files: |
@@ -49,5 +51,3 @@ jobs:
             dist-mac/*.zip
             dist-linux/*.AppImage
             dist-linux/*.deb
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
