@@ -132,7 +132,7 @@ export default function Settings(): JSX.Element {
           <CardHeader><CardTitle className="text-lg font-semibold">关于</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <p><strong>PG-Tracker</strong> - 保研信息收集与决策分析系统</p>
-            <p>版本：1.0.0</p>
+            <p>版本：2.1.1</p>
             <p>数据存储：本地 SQLite 数据库</p>
             <p className="pt-2">本应用完全离线运行，所有数据均存储在本地设备上，保护你的隐私。</p>
           </CardContent>
