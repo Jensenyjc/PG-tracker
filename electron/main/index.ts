@@ -15,45 +15,15 @@ const platform = process.platform || 'win32'
 let prisma: any = null
 
 /**
- * 数据库初始化主函数。
- * 每次启动时检测用户数据库的 schema 版本，如果缺少 EmailTemplate 表，
- * 说明是旧版本安装后覆盖安装的场景，强制用安装包里的最新数据库替换。
+ * 获取数据库文件路径。
+ * 开发：prisma/dev.db
+ * 生产：userData/dev.db（由 app.getPath('userData') 确定，不依赖 .env）
  */
-async function initializeDatabase(): Promise<string> {
+function getDatabasePath(): string {
   if (isDev) {
-    log.info('[Dev] Using local dev database at:', join(__dirname, '../../prisma/dev.db'))
     return join(__dirname, '../../prisma/dev.db')
   }
-
-  const userDataPath = app.getPath('userData')
-  const userDbPath = join(userDataPath, 'dev.db')
-  const resourceDbPath = join(process.resourcesPath, 'prisma', 'dev.db')
-
-  if (!existsSync(userDbPath)) {
-    // 首次安装
-    if (existsSync(resourceDbPath)) {
-      copyFileSync(resourceDbPath, userDbPath)
-      log.info('[Prod] First run: copied seed database from resources')
-    }
-    return userDbPath
-  }
-
-  // 覆盖安装场景：检测 EmailTemplate 表是否存在于用户数据库
-  try {
-    const client = await getPrisma()
-    await client.emailTemplate.findFirst({ select: { id: true } })
-    log.info('[Prod] User database schema is up to date')
-    return userDbPath
-  } catch (err: any) {
-    // 表不存在，说明是旧版本覆盖安装
-    log.warn('[Prod] User database schema is outdated. Replacing with fresh database from resources.', err?.message)
-    try { unlinkSync(userDbPath) } catch {}
-    if (existsSync(resourceDbPath)) {
-      copyFileSync(resourceDbPath, userDbPath)
-      log.info('[Prod] Database replaced successfully')
-    }
-    return userDbPath
-  }
+  return join(app.getPath('userData'), 'dev.db')
 }
 
 /**
@@ -65,37 +35,85 @@ function getPrismaClientPath(): string {
   if (isDev) {
     return join(__dirname, '../../node_modules/.prisma/client')
   }
-
-  // 生产环境：extraResources 中的 .prisma/client 目录
   const extraPrismaPath = join(process.resourcesPath, '.prisma', 'client')
   log.info('Prisma client path (extraResources):', extraPrismaPath)
   log.info('index.js exists:', existsSync(join(extraPrismaPath, 'index.js')))
   return extraPrismaPath
 }
 
+/**
+ * 数据库初始化主函数。
+ * 每次启动时检测用户数据库的 schema 版本，如果缺少 EmailTemplate 表，
+ * 说明是旧版本安装后覆盖安装的场景，强制用安装包里的最新数据库替换。
+ * 不再调用 getPrisma()（避免循环依赖），直接用临时 PrismaClient 按路径检测。
+ */
+async function initializeDatabase(): Promise<string> {
+  const dbPath = getDatabasePath()
+
+  if (isDev) {
+    log.info('[Dev] Using local dev database at:', dbPath)
+    return dbPath
+  }
+
+  const userDbPath = dbPath
+  const resourceDbPath = join(process.resourcesPath, 'prisma', 'dev.db')
+
+  if (!existsSync(userDbPath)) {
+    if (existsSync(resourceDbPath)) {
+      copyFileSync(resourceDbPath, userDbPath)
+      log.info('[Prod] First run: copied seed database from resources')
+    }
+    return userDbPath
+  }
+
+  // 覆盖安装场景：检测 EmailTemplate 表是否存在于用户数据库
+  try {
+    const { PrismaClient: PC } = require(getPrismaClientPath())
+    const tmpPrisma = new PC({ datasources: { db: { url: `file:${userDbPath}` } } })
+    await tmpPrisma.emailTemplate.findFirst({ select: { id: true } })
+    await tmpPrisma.$disconnect()
+    log.info('[Prod] User database schema is up to date')
+    return userDbPath
+  } catch (err: any) {
+    log.warn('[Prod] User database schema is outdated. Replacing with fresh database from resources.', err?.message)
+    try { unlinkSync(userDbPath) } catch {}
+    try { unlinkSync(userDbPath + '-shm') } catch {}
+    try { unlinkSync(userDbPath + '-wal') } catch {}
+    if (existsSync(resourceDbPath)) {
+      copyFileSync(resourceDbPath, userDbPath)
+      log.info('[Prod] Database replaced successfully')
+    }
+    return userDbPath
+  }
+}
+
 async function getPrisma(): Promise<any> {
-  if (!prisma) {
-    const prismaPath = getPrismaClientPath()
+  if (prisma) return prisma
 
-    // 验证关键文件存在
-    const engineFile = join(prismaPath, 'query_engine-windows.dll.node')
-    log.info('=== Prisma Init ===')
-    log.info('  Prisma Client path:', prismaPath)
-    log.info('  Database URL:', process.env.DATABASE_URL)
-    log.info('  app.isPackaged:', app.isPackaged)
-    log.info('  query engine exists:', existsSync(engineFile))
+  const prismaPath = getPrismaClientPath()
+  const dbPath = getDatabasePath()
+  const dbUrl = `file:${dbPath}`
 
-    if (!isDev) {
-      process.env.PRISMA_QUERY_ENGINE_LIBRARY = engineFile
-    }
+  const engineFile = join(prismaPath, 'query_engine-windows.dll.node')
+  log.info('=== Prisma Init ===')
+  log.info('  Prisma Client path:', prismaPath)
+  log.info('  Database URL (explicit):', dbUrl)
+  log.info('  app.isPackaged:', app.isPackaged)
+  log.info('  query engine exists:', existsSync(engineFile))
 
-    try {
-      const { PrismaClient } = require(prismaPath)
-      prisma = new PrismaClient()
-    } catch (err) {
-      log.error('Failed to load Prisma Client:', err)
-      throw err
-    }
+  if (!isDev) {
+    process.env.PRISMA_QUERY_ENGINE_LIBRARY = engineFile
+  }
+
+  try {
+    const { PrismaClient } = require(prismaPath)
+    // 显式传递 datasources.db.url，不再依赖 process.env.DATABASE_URL
+    prisma = new PrismaClient({
+      datasources: { db: { url: dbUrl } }
+    })
+  } catch (err) {
+    log.error('Failed to load Prisma Client:', err)
+    throw err
   }
   return prisma
 }
