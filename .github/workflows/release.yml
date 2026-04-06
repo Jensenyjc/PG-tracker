@@ -1,57 +1,53 @@
-name: Build and Release
+name: Release
 
 on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
 
 jobs:
-  release:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            artifact_name: PG-Tracker-2.1.1-win-setup.exe
+            build_cmd: npm run build:win
 
+          - platform: macos
+            artifact_name: PG-Tracker-Mac-2.1.1.dmg
+            build_cmd: npm run build:mac-standalone
+
+          - platform: linux
+            artifact_name: PG-Tracker-Linux-2.1.1.AppImage
+            build_cmd: npm run build:linux-standalone
+
+    runs-on: ${{ matrix.platform }}-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: npm ci
 
-      - name: Generate Prisma Client
-        run: npx prisma generate
+      - name: Build
+        run: ${{ matrix.build_cmd }}
 
-      - name: Build Application
-        run: npm run build
-
-      - name: Build Windows Installer
-        run: npx electron-builder --win nsis --publish never
-
-      - name: Read Changelog
-        id: changelog
-        run: |
-          $content = Get-Content CHANGELOG.md -Raw -Encoding UTF8
-          $content = $content -replace "`r`n", "%0A"
-          echo "body=$content" >> $env:GITHUB_OUTPUT
-
-      - name: Extract Version Tag
-        id: version
-        run: |
-          $tag = $env:GITHUB_REF_NAME
-          echo "tag=$tag" >> $env:GITHUB_OUTPUT
-
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v1
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
         with:
-          files: release/*.exe
-          draft: false
-          body_path: CHANGELOG.md
-          generate_release_notes: false
+          tag_name: ${{ github.ref_name }}
+          files: |
+            release/${{ matrix.artifact_name }}
+            dist-mac/*.zip
+            dist-linux/*.AppImage
+            dist-linux/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
