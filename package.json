@@ -2,7 +2,7 @@
   "name": "pg-tracker",
   "version": "2.1.1",
   "description": "保研信息收集与决策分析系统",
-  "author": "Your Name",
+  "author": "Jensenyjc <jensenyjc@example.com>",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

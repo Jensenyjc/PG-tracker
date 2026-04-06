@@ -3,3 +3,6 @@ release/
 out/
 .env
 image/
+dist-win/
+dist-linux/
+dist-mac/
