@@ -434,18 +434,6 @@ pg-tracker-v2/
 
 ---
 
-## 跨平台打包
-
-| 平台 | 命令 | 输出格式 |
-|------|------|---------|
-| Windows | `npm run build:win` | NSIS 安装包 (.exe) |
-| macOS | `npm run build:mac-standalone` | DMG + ZIP |
-| Linux | `npm run build:linux-standalone` | AppImage + DEB |
-
-> ⚠️ 跨平台打包需要在对应操作系统上运行（Windows 上无法打包 macOS/Linux，反之亦然）。建议使用 GitHub Actions 进行自动化多平台构建。
-
----
-
 ## License
 
 MIT
