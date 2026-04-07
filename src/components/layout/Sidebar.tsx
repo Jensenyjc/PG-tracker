@@ -56,7 +56,7 @@ export default function Sidebar({ currentView, onViewChange, onSelectInstitution
 
       <div className="p-4 border-t border-border">
         <p className="text-xs text-muted-foreground text-center">
-          v2.2.0 - 本地数据存储
+          v2.2.1 - 本地数据存储
         </p>
       </div>
     </aside>
