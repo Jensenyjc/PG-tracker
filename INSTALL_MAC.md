@@ -15,6 +15,6 @@
 1. 打开 Mac 自带的"终端 (Terminal)"。
 2. 复制并运行以下命令（可能需要输入电脑开机密码）：
 
-   `sudo xattr -rd com.apple.quarantine /Applications/PG-Tracker-Mac.app`
+   `sudo xattr -rd com.apple.quarantine /Applications/PG-Tracker.app`
 
 3. 执行完毕后，即可正常双击打开软件。
