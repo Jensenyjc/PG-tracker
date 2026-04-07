@@ -1,4 +1,5 @@
-import { Moon, Sun, Monitor, Database, Download, Upload, Trash2 } from 'lucide-react'
+import { Moon, Sun, Monitor, Database, Download, Upload, Trash2, Mail } from 'lucide-react'
+import avatarUrl from '../../assets/avatar.jpg'
 import { useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'
 import { Button } from '../ui/button'
@@ -51,12 +52,32 @@ export default function Settings(): JSX.Element {
           const content = await readFile()
           const data = JSON.parse(content)
           if (Array.isArray(data)) {
+            let importedCount = 0
             for (const institution of data) {
-              const { id, advisors, tasks, ...rest } = institution
-              await window.api.institution.create(rest)
+              const { id, advisors, tasks, createdAt, updatedAt, ...rest } = institution
+              const created = await window.api.institution.create(rest)
+              if (created && created.id) {
+                // 导入关联的导师
+                if (Array.isArray(advisors)) {
+                  for (const advisor of advisors) {
+                    const { id: aId, institutionId, assets, interviews, createdAt: aC, updatedAt: aU, ...advisorRest } = advisor
+                    await window.api.advisor.create({ ...advisorRest, institutionId: created.id })
+                  }
+                }
+                // 导入关联的任务
+                if (Array.isArray(tasks)) {
+                  for (const task of tasks) {
+                    const { id: tId, institutionId, createdAt: tC, ...taskRest } = task
+                    await window.api.task.create({ ...taskRest, institutionId: created.id })
+                  }
+                }
+                importedCount++
+              }
             }
-            alert('导入成功！')
+            alert(`导入成功！共导入 ${importedCount} 所院校及关联数据。`)
             window.location.reload()
+          } else {
+            alert('导入失败：数据格式不正确（需要是院校数组）')
           }
         } catch (err) {
           alert('导入失败：无效的数据格式')
@@ -132,9 +153,23 @@ export default function Settings(): JSX.Element {
           <CardHeader><CardTitle className="text-lg font-semibold">关于</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <p><strong>PG-Tracker</strong> - 保研信息收集与决策分析系统</p>
-            <p>版本：2.1.1</p>
+            <p>版本：2.2.0</p>
             <p>数据存储：本地 SQLite 数据库</p>
             <p className="pt-2">本应用完全离线运行，所有数据均存储在本地设备上，保护你的隐私。</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-lg font-semibold flex items-center gap-2"><Mail className="h-5 w-5" />联系我们</CardTitle></CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">使用中遇到问题、有功能建议，或想交流保研经验，欢迎随时联系：</p>
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/30">
+              <img src={avatarUrl} alt="客服头像" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">微信号</p>
+                <p className="text-sm font-medium text-foreground select-all">W17331702101</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -1,7 +1,28 @@
-appId: com.pgtracker.app
-productName: PG-Tracker-Linux
+appId: com.pg-tracker.app
+productName: PG-Tracker
+
 directories:
+  buildResources: build
   output: dist-linux
+
+files:
+  - out/**/*
+  - package.json
+
+extraResources:
+  - from: prisma
+    to: prisma
+  - from: node_modules/.prisma/client
+    to: .prisma/client
+  - from: node_modules/@prisma/engines
+    to: node_modules/@prisma/engines
+
+asar: true
+asarUnpack:
+  - "**/*.node"
+  - "**/node_modules/.prisma/**"
+  - "**/node_modules/@prisma/engines/**"
+
 linux:
   target:
     - target: AppImage
@@ -12,3 +33,4 @@ linux:
         - x64
   category: Education
   icon: resources/icon.png
+  artifactName: ${productName}-${version}-linux-${arch}.${ext}

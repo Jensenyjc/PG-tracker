@@ -25,7 +25,7 @@ export default function InstitutionForm({ institution, onClose, onSuccess }: Ins
         campDeadline: institution.campDeadline || '',
         pushDeadline: institution.pushDeadline || '',
         expectedQuota: institution.expectedQuota || undefined,
-        policyTags: institution.policyTags ? JSON.parse(institution.policyTags) : [] as string[]
+        policyTags: (() => { try { return institution.policyTags ? JSON.parse(institution.policyTags) : [] } catch { return [] } })() as string[]
       }
     }
     return {

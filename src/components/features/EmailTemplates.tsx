@@ -123,26 +123,30 @@ export default function EmailTemplates(): JSX.Element {
   const previewHtml = useMemo(() => renderPreviewText(editedContent, fillValues), [editedContent, fillValues])
   const previewSubjectHtml = useMemo(() => renderPreviewText(editedSubject, fillValues), [editedSubject, fillValues])
 
-  useEffect(() => { loadEmailTemplates() }, [])
-
   useEffect(() => {
-    if (!initRef.current && emailTemplates.length === 0) {
-      initRef.current = true
-      initDefaultTemplates()
-    }
-  }, [emailTemplates])
-
-  const initDefaultTemplates = async () => {
-    for (const tpl of defaultTemplates) {
-      const result = await createEmailTemplate({ name: tpl.name, subject: tpl.subject, content: tpl.content })
-      if (result && result.id) {
-        for (const v of tpl.variables) {
-          await window.api.emailVariable.create({ name: v, templateId: result.id })
+    let cancelled = false
+    const init = async () => {
+      // 先加载，等结果回来再判断是否需要创建默认模板
+      await loadEmailTemplates()
+      if (cancelled) return
+      // 加载完后再读一次最新的 store 状态
+      const current = useStore.getState().emailTemplates
+      if (current.length === 0 && !initRef.current) {
+        initRef.current = true
+        for (const tpl of defaultTemplates) {
+          const result = await createEmailTemplate({ name: tpl.name, subject: tpl.subject, content: tpl.content })
+          if (result && result.id) {
+            for (const v of tpl.variables) {
+              await window.api.emailVariable.create({ name: v, templateId: result.id })
+            }
+          }
         }
+        await loadEmailTemplates()
       }
     }
-    await loadEmailTemplates()
-  }
+    init()
+    return () => { cancelled = true }
+  }, [])
 
   const templates = emailTemplates.length > 0
     ? emailTemplates
@@ -275,14 +279,14 @@ export default function EmailTemplates(): JSX.Element {
               </button>
             </div>
             {showAddTemplate && (
-              <div className="space-y-1">
+              <div className="mt-2 p-3 rounded-lg border border-border bg-muted/30 space-y-2.5">
                 <Input placeholder="模板名称" value={newTemplateName}
                   onChange={e => setNewTemplateName(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleAddTemplate()}
-                  autoFocus className="text-sm h-8" />
-                <div className="flex gap-1">
-                  <Button size="sm" className="flex-1 h-7 text-xs" onClick={handleAddTemplate} disabled={isCreating}><Plus className="h-3 w-3 mr-1" />{isCreating ? '创建中...' : '创建'}</Button>
-                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setShowAddTemplate(false); setNewTemplateName('') }}><X className="h-3 w-3" /></Button>
+                  autoFocus className="text-sm h-9" />
+                <div className="flex gap-2">
+                  <Button size="sm" className="flex-1 h-8 text-xs" onClick={handleAddTemplate} disabled={isCreating}><Plus className="h-3 w-3 mr-1" />{isCreating ? '创建中...' : '创建'}</Button>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setShowAddTemplate(false); setNewTemplateName('') }}><X className="h-3.5 w-3.5" /></Button>
                 </div>
               </div>
             )}

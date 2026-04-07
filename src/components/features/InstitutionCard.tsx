@@ -33,7 +33,8 @@ export default function InstitutionCard({ institution, onClick, onEdit }: Instit
   }
 
   const deadlineStatus = getDeadlineStatus()
-  const policyTags = institution.policyTags ? JSON.parse(institution.policyTags) : []
+  let policyTags: string[] = []
+  try { policyTags = institution.policyTags ? JSON.parse(institution.policyTags) : [] } catch { /* malformed JSON, ignore */ }
 
   return (
     <div

@@ -14,14 +14,17 @@ jobs:
           - platform: windows
             build_cmd: npm run build:win
             config: electron-builder.yml
+            artifact_pattern: release/*.exe
 
           - platform: macos
             build_cmd: npm run build:mac-standalone
             config: electron-builder-mac.yml
+            artifact_pattern: dist-mac/*
 
           - platform: ubuntu
             build_cmd: npm run build:linux-standalone
             config: electron-builder-linux.yml
+            artifact_pattern: dist-linux/*
 
     runs-on: ${{ matrix.platform }}-latest
     steps:
@@ -41,3 +44,12 @@ jobs:
         run: ${{ matrix.build_cmd }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact_pattern }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,7 +1,28 @@
-appId: com.pgtracker.app
-productName: PG-Tracker-Mac
+appId: com.pg-tracker.app
+productName: PG-Tracker
+
 directories:
+  buildResources: build
   output: dist-mac
+
+files:
+  - out/**/*
+  - package.json
+
+extraResources:
+  - from: prisma
+    to: prisma
+  - from: node_modules/.prisma/client
+    to: .prisma/client
+  - from: node_modules/@prisma/engines
+    to: node_modules/@prisma/engines
+
+asar: true
+asarUnpack:
+  - "**/*.node"
+  - "**/node_modules/.prisma/**"
+  - "**/node_modules/@prisma/engines/**"
+
 mac:
   target:
     - target: dmg
@@ -16,3 +37,4 @@ mac:
   gatekeeperAssess: false
   hardenedRuntime: false
   identity: null
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}

@@ -1,11 +1,40 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join, dirname } from 'path'
-import { existsSync, copyFileSync, unlinkSync } from 'fs'
+import { existsSync, copyFileSync, unlinkSync, mkdirSync, writeFileSync } from 'fs'
 import log from 'electron-log'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 
 const execAsync = promisify(exec)
+
+// ==================== 全局崩溃日志捕捉 ====================
+// 必须在最早期注册，确保任何未捕获的异常都能弹窗显示
+process.on('uncaughtException', (error) => {
+  const msg = `未捕获异常: ${error.message}\n\nStack: ${error.stack}`
+  log.error('[CRASH]', msg)
+  try {
+    dialog.showErrorBox('PG-Tracker 崩溃报告', msg)
+  } catch {
+    // dialog 可能在 app ready 之前不可用，写入文件兜底
+    try {
+      const crashLogPath = join(app.getPath('userData'), 'crash.log')
+      writeFileSync(crashLogPath, `[${new Date().toISOString()}] ${msg}\n`, { flag: 'a' })
+    } catch {}
+  }
+})
+
+process.on('unhandledRejection', (reason: any) => {
+  const msg = `未处理的 Promise 拒绝: ${reason?.message || reason}\n\nStack: ${reason?.stack || '无堆栈信息'}`
+  log.error('[CRASH]', msg)
+  try {
+    dialog.showErrorBox('PG-Tracker 错误报告', msg)
+  } catch {
+    try {
+      const crashLogPath = join(app.getPath('userData'), 'crash.log')
+      writeFileSync(crashLogPath, `[${new Date().toISOString()}] ${msg}\n`, { flag: 'a' })
+    } catch {}
+  }
+})
 
 // Platform detection
 const isDev = !app.isPackaged
@@ -58,10 +87,23 @@ async function initializeDatabase(): Promise<string> {
   const userDbPath = dbPath
   const resourceDbPath = join(process.resourcesPath, 'prisma', 'dev.db')
 
+  // 确保 userData 目录存在
+  const userDataDir = dirname(userDbPath)
+  if (!existsSync(userDataDir)) {
+    mkdirSync(userDataDir, { recursive: true })
+    log.info('[Prod] Created userData directory:', userDataDir)
+  }
+
   if (!existsSync(userDbPath)) {
     if (existsSync(resourceDbPath)) {
       copyFileSync(resourceDbPath, userDbPath)
       log.info('[Prod] First run: copied seed database from resources')
+    } else {
+      log.error('[Prod] FATAL: seed database not found at:', resourceDbPath)
+      dialog.showErrorBox(
+        'PG-Tracker 启动失败',
+        `找不到初始数据库文件。\n预期路径: ${resourceDbPath}\n\n请尝试重新安装软件。`
+      )
     }
     return userDbPath
   }
@@ -94,15 +136,35 @@ async function getPrisma(): Promise<any> {
   const dbPath = getDatabasePath()
   const dbUrl = `file:${dbPath}`
 
-  const engineFile = join(prismaPath, 'query_engine-windows.dll.node')
+  // 多路径搜索 query engine，兼容不同打包结构
+  const engineCandidates = [
+    join(prismaPath, 'query_engine-windows.dll.node'),
+    join(process.resourcesPath, 'node_modules', '@prisma', 'engines', 'query_engine-windows.dll.node'),
+    join(process.resourcesPath, '.prisma', 'client', 'query_engine-windows.dll.node')
+  ]
+  let engineFile = engineCandidates[0] // 默认
+  for (const candidate of engineCandidates) {
+    if (existsSync(candidate)) {
+      engineFile = candidate
+      break
+    }
+  }
+
   log.info('=== Prisma Init ===')
   log.info('  Prisma Client path:', prismaPath)
   log.info('  Database URL (explicit):', dbUrl)
   log.info('  app.isPackaged:', app.isPackaged)
+  log.info('  query engine path:', engineFile)
   log.info('  query engine exists:', existsSync(engineFile))
 
   if (!isDev) {
     process.env.PRISMA_QUERY_ENGINE_LIBRARY = engineFile
+  }
+
+  if (!isDev && !existsSync(engineFile)) {
+    const msg = `Prisma 查询引擎未找到！\n搜索路径:\n${engineCandidates.map(p => '  - ' + p + ' (' + (existsSync(p) ? '存在' : '不存在') + ')').join('\n')}`
+    log.error(msg)
+    dialog.showErrorBox('PG-Tracker 启动失败', msg)
   }
 
   try {
@@ -672,8 +734,30 @@ app.whenReady().then(async () => {
     const client = await getPrisma()
     await client.$connect()
     log.info('Database connected successfully')
-  } catch (error) {
-    log.error('Database initialization failed:', error)
+
+    // 一次性清理重复的邮件模板（按 name 去重，只保留每个名称最早创建的一个）
+    try {
+      const allTemplates = await client.emailTemplate.findMany({ orderBy: { createdAt: 'asc' } })
+      const seen = new Map<string, string>() // name -> first id
+      const duplicateIds: string[] = []
+      for (const tpl of allTemplates) {
+        if (seen.has(tpl.name)) {
+          duplicateIds.push(tpl.id)
+        } else {
+          seen.set(tpl.name, tpl.id)
+        }
+      }
+      if (duplicateIds.length > 0) {
+        await client.emailTemplate.deleteMany({ where: { id: { in: duplicateIds } } })
+        log.info(`[Cleanup] Removed ${duplicateIds.length} duplicate email templates`)
+      }
+    } catch (err: any) {
+      log.warn('[Cleanup] Failed to deduplicate email templates:', err?.message)
+    }
+  } catch (error: any) {
+    const msg = `数据库初始化失败: ${error?.message}\n\nStack: ${error?.stack || '无堆栈'}`
+    log.error(msg)
+    dialog.showErrorBox('PG-Tracker 启动失败', msg)
   }
 
   createWindow()

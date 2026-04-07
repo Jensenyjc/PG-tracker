@@ -52,7 +52,14 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
   }, [institutionId, checkConflicts])
 
   const handleDelete = async (): Promise<void> => {
-    if (confirm(`确定要删除 ${institution.name} 吗？此操作不可恢复。`)) {
+    const advisorCount = institution.advisors?.length || 0
+    const taskCount = institution.tasks?.length || 0
+    const detail = [
+      advisorCount > 0 ? `${advisorCount} 位导师` : '',
+      taskCount > 0 ? `${taskCount} 个任务` : ''
+    ].filter(Boolean).join('、')
+    const extra = detail ? `\n\n关联的 ${detail} 也将被一并删除。` : ''
+    if (confirm(`确定要删除「${institution.name}」吗？此操作不可恢复。${extra}`)) {
       await deleteInstitution(institutionId)
       onBack()
     }
@@ -62,7 +69,8 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
     await updateTask(task.id, { ...task, isCompleted: !task.isCompleted })
   }
 
-  const policyTags = institution.policyTags ? JSON.parse(institution.policyTags) : []
+  let policyTags: string[] = []
+  try { policyTags = institution.policyTags ? JSON.parse(institution.policyTags) : [] } catch { /* malformed JSON, ignore */ }
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -296,7 +304,7 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
                       <p className="text-xs text-muted-foreground">截止：{format(new Date(task.dueDate), 'yyyy/MM/dd', { locale: zhCN })}</p>
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => { setSelectedTask(task); setShowTaskForm(true) }}><Edit2 className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => deleteTask(task.id)}><Trash2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => { if (confirm('确定删除此任务？')) deleteTask(task.id) }}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 ))}
               </div>
