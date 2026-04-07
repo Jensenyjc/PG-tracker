@@ -5,7 +5,7 @@
 一款专为中国大学生设计的跨平台保研申请管理桌面应用，支持 Windows、macOS、Linux 三大操作系统，帮助你系统化管理目标院校、导师信息、申请进度和面试记录，所有数据完全本地存储，保护隐私。
 
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Version](https://img.shields.io/badge/version-2.1.1-blue)
+![Version](https://img.shields.io/badge/version-2.2.0-blue)
 ![Electron](https://img.shields.io/badge/Electron-33.4-47848F)
 ![React](https://img.shields.io/badge/React-18.3-61DAFB)
 
@@ -57,7 +57,7 @@
 |:--:|
 | ![设置](docs/images/设置页面.png) |
 
-> **设置**：主题切换（浅色/深色/跟随系统），数据导出 JSON 备份，数据导入恢复，数据清空（双重确认防误删）。
+> **设置**：主题切换（浅色/深色/跟随系统），数据导出 JSON 备份，数据导入恢复，数据清空（双重确认防误删），联系我们卡片（客服微信）。
 
 ---
 
@@ -72,7 +72,7 @@
 #### 下载
 
 1. 打开 [Releases](https://github.com/Jensenyjc/PG-tracker/releases) 页面
-2. 在最新版本（v2.1.1）的 Assets 中，找到 **`PG-Tracker-2.1.1-win-setup.exe`**（或更高版本）
+2. 在最新版本（v2.2.0）的 Assets 中，找到 **`PG-Tracker-2.2.0-win-setup.exe`**
 3. 点击下载
 
 #### 安装与运行
@@ -85,7 +85,7 @@
 #### 注意事项
 
 - 如果 Windows 提示"SmartScreen 筛选器已阻止启动"，点击"更多信息"→"仍要运行"即可，这是未签名软件的正常提示
-- 数据默认保存在 `%APPDATA%\pg-tracker\dev.db`，可前往"设置"页面导出 JSON 备份
+- 数据默认保存在 `%APPDATA%\PG-Tracker\dev.db`，可前往"设置"页面导出 JSON 备份
 
 ---
 
@@ -94,22 +94,22 @@
 #### 下载
 
 1. 打开 [Releases](https://github.com/Jensenyjc/PG-tracker/releases) 页面
-2. 在最新版本（v2.1.1）的 Assets 中，找到以下任意文件：
-   - **`PG-Tracker-Mac-2.1.1.dmg`** — 推荐，图形化安装界面
-   - **`PG-Tracker-Mac-2.1.1.zip`** — 便携版，无需安装
+2. 在最新版本（v2.2.0）的 Assets 中，找到以下任意文件：
+   - **`PG-Tracker-2.2.0-mac-x64.dmg`** — 推荐，图形化安装界面
+   - **`PG-Tracker-2.2.0-mac-x64.zip`** — 便携版，无需安装
 
 #### 安装步骤
 
 **方式一：通过 DMG 安装（推荐）**
 
 1. 双击下载的 `.dmg` 文件，挂载磁盘镜像
-2. 将镜像中的 **PG-Tracker-Mac.app** 拖入左侧的"应用程序"文件夹
+2. 将镜像中的 **PG-Tracker.app** 拖入左侧的"应用程序"文件夹
 3. 等待复制完成后，弹出 DMG
 
 **方式二：通过 ZIP 解压运行**
 
 1. 双击 `.zip` 文件自动解压
-2. 进入解压后的文件夹，将 **PG-Tracker-Mac.app** 拖入"应用程序"文件夹
+2. 进入解压后的文件夹，将 **PG-Tracker.app** 拖入"应用程序"文件夹
 
 #### ⚠️ 重要：绕过 macOS 安全拦截
 
@@ -117,7 +117,7 @@ macOS 默认只允许运行来自 App Store 的已签名应用，首次打开未
 
 **方法 1：右键打开（推荐）**
 
-1. 在"应用程序"文件夹中找到 PG-Tracker-Mac
+1. 在"应用程序"文件夹中找到 PG-Tracker
 2. **不要双击**，在图标上**右键单击**
 3. 选择弹出菜单中的**"打开"**
 4. 系统会弹出第二次确认对话框，点击**"打开"**即可
@@ -127,7 +127,7 @@ macOS 默认只允许运行来自 App Store 的已签名应用，首次打开未
 1. 打开 Mac 自带的**终端（Terminal）**
 2. 复制并运行以下命令（复制整行后回车）：
    ```bash
-   sudo xattr -rd com.apple.quarantine /Applications/PG-Tracker-Mac.app
+   sudo xattr -rd com.apple.quarantine /Applications/PG-Tracker.app
    ```
 3. 输入电脑开机密码（输入时屏幕不显示字符，正常现象），回车确认
 4. 完成后即可正常双击运行
@@ -135,7 +135,7 @@ macOS 默认只允许运行来自 App Store 的已签名应用，首次打开未
 #### 注意事项
 
 - 本软件为开源免签名版本，**不是病毒**，可放心运行
-- 数据保存在 `~/Library/Application Support/pg-tracker/`
+- 数据保存在 `~/Library/Application Support/PG-Tracker/`
 
 详细说明：[INSTALL_MAC.md](INSTALL_MAC.md)
 
@@ -146,9 +146,9 @@ macOS 默认只允许运行来自 App Store 的已签名应用，首次打开未
 #### 下载
 
 1. 打开 [Releases](https://github.com/Jensenyjc/PG-tracker/releases) 页面
-2. 在最新版本（v2.1.1）的 Assets 中，找到以下任意文件：
-   - **`PG-Tracker-Linux-2.1.1.AppImage`** — 推荐，便携免安装
-   - **`PG-Tracker-Linux-2.1.1.deb`** — Debian/Ubuntu 系专用安装包
+2. 在最新版本（v2.2.0）的 Assets 中，找到以下任意文件：
+   - **`PG-Tracker-2.2.0-linux-x64.AppImage`** — 推荐，便携免安装
+   - **`PG-Tracker-2.2.0-linux-x64.deb`** — Debian/Ubuntu 系专用安装包
 
 #### 安装步骤
 
@@ -163,7 +163,7 @@ macOS 默认只允许运行来自 App Store 的已签名应用，首次打开未
    **终端方式：**
    ```bash
    cd ~/Downloads
-   chmod +x PG-Tracker-Linux-*.AppImage
+   chmod +x PG-Tracker-2.2.0-linux-x64.AppImage
    ```
 
 3. 双击文件即可运行，**无需安装**
@@ -174,7 +174,7 @@ macOS 默认只允许运行来自 App Store 的已签名应用，首次打开未
 2. 点击"安装"，输入密码，等待安装完成
 3. 若遇到依赖问题，在终端运行以下命令修复：
    ```bash
-   sudo dpkg -i ~/Downloads/PG-Tracker-Linux-*.deb
+   sudo dpkg -i ~/Downloads/PG-Tracker-2.2.0-linux-x64.deb
    sudo apt-get install -f
    ```
 
@@ -188,7 +188,7 @@ macOS 默认只允许运行来自 App Store 的已签名应用，首次打开未
   # Fedora
   sudo dnf install gtk3
   ```
-- 数据保存在 `~/.config/pg-tracker/`
+- 数据保存在 `~/.config/PG-Tracker/`
 
 详细说明：[INSTALL_LINUX.md](INSTALL_LINUX.md)
 
@@ -333,8 +333,9 @@ PG-Tracker 围绕保研申请的完整生命周期设计，将院校筛选、导
 
 - **主题切换**：浅色 / 深色 / 跟随系统
 - **数据导出**：将所有数据导出为 JSON 文件备份（命名格式：`pg-tracker-backup-YYYY-MM-DD.json`）
-- **数据导入**：从 JSON 备份文件恢复数据
+- **数据导入**：从 JSON 备份文件恢复数据（完整恢复院校、导师、任务、邮件模板等所有数据）
 - **数据清除**：清空所有本地数据（双重确认防误删）
+- **联系我们**：客服微信展示，有问题或建议欢迎联系
 
 ---
 
