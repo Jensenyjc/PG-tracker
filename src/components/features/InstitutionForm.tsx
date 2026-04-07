@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { useStore, Institution } from '../../stores/appStore'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 
 interface InstitutionFormProps {
@@ -41,6 +41,10 @@ export default function InstitutionForm({ institution, onClose, onSuccess }: Ins
   })
   const [tagInput, setTagInput] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // 用户修改表单时清除之前的错误提示
+  useEffect(() => { setSubmitError(null) }, [formData.name, formData.department])
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
@@ -63,7 +67,9 @@ export default function InstitutionForm({ institution, onClose, onSuccess }: Ins
         await addInstitution(data)
       }
       onSuccess()
-    } catch (error) {
+    } catch (error: any) {
+      const msg = error?.message || '保存失败，请重试'
+      setSubmitError(msg)
       console.error('Failed to save institution:', error)
     } finally {
       setIsSubmitting(false)
@@ -95,6 +101,7 @@ export default function InstitutionForm({ institution, onClose, onSuccess }: Ins
       >
         <DialogHeader>
           <DialogTitle>{institution ? '编辑院校' : '添加院校'}</DialogTitle>
+          <DialogDescription>填写院校基本信息并保存</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -165,6 +172,9 @@ export default function InstitutionForm({ institution, onClose, onSuccess }: Ins
           </div>
 
           <DialogFooter>
+            {submitError && (
+              <p className="text-xs text-destructive w-full text-center mb-1">{submitError}</p>
+            )}
             <Button type="button" variant="outline" onClick={onClose}>取消</Button>
             <Button type="submit" disabled={isSubmitting}>{isSubmitting ? '保存中...' : institution ? '保存修改' : '添加院校'}</Button>
           </DialogFooter>

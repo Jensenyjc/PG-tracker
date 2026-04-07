@@ -8,32 +8,28 @@ import { promisify } from 'util'
 const execAsync = promisify(exec)
 
 // ==================== 全局崩溃日志捕捉 ====================
-// 必须在最早期注册，确保任何未捕获的异常都能弹窗显示
+// 必须在最早期注册，确保任何未捕获的异常都能记录
+// 注意：dialog.showErrorBox 需要 app.ready 之后才能用，这里只写文件
 process.on('uncaughtException', (error) => {
   const msg = `未捕获异常: ${error.message}\n\nStack: ${error.stack}`
   log.error('[CRASH]', msg)
+  // 写日志文件，不在此处弹窗（app 可能还未 ready）
   try {
-    dialog.showErrorBox('PG-Tracker 崩溃报告', msg)
-  } catch {
-    // dialog 可能在 app ready 之前不可用，写入文件兜底
-    try {
-      const crashLogPath = join(app.getPath('userData'), 'crash.log')
-      writeFileSync(crashLogPath, `[${new Date().toISOString()}] ${msg}\n`, { flag: 'a' })
-    } catch {}
-  }
+    // 直接写固定路径，不依赖 app.getPath
+    const crashLogPath = '/tmp/pg-tracker-crash.log'
+    writeFileSync(crashLogPath, `[${new Date().toISOString()}] ${msg}\n`, { flag: 'a' })
+  } catch {}
+  // 顶层异常必须退出，否则进程处于不可预期状态
+  process.exit(1)
 })
 
 process.on('unhandledRejection', (reason: any) => {
   const msg = `未处理的 Promise 拒绝: ${reason?.message || reason}\n\nStack: ${reason?.stack || '无堆栈信息'}`
   log.error('[CRASH]', msg)
   try {
-    dialog.showErrorBox('PG-Tracker 错误报告', msg)
-  } catch {
-    try {
-      const crashLogPath = join(app.getPath('userData'), 'crash.log')
-      writeFileSync(crashLogPath, `[${new Date().toISOString()}] ${msg}\n`, { flag: 'a' })
-    } catch {}
-  }
+    const crashLogPath = '/tmp/pg-tracker-crash.log'
+    writeFileSync(crashLogPath, `[${new Date().toISOString()}] ${msg}\n`, { flag: 'a' })
+  } catch {}
 })
 
 // Platform detection
@@ -758,6 +754,7 @@ app.whenReady().then(async () => {
     const msg = `数据库初始化失败: ${error?.message}\n\nStack: ${error?.stack || '无堆栈'}`
     log.error(msg)
     dialog.showErrorBox('PG-Tracker 启动失败', msg)
+    return // 初始化失败时不创建窗口，直接退出
   }
 
   createWindow()

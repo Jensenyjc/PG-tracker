@@ -6,50 +6,77 @@ on:
       - 'v*'
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows
-            build_cmd: npm run build:win
-            config: electron-builder.yml
-            artifact_pattern: release/*.exe
-
-          - platform: macos
-            build_cmd: npm run build:mac-standalone
-            config: electron-builder-mac.yml
-            artifact_pattern: dist-mac/*
-
-          - platform: ubuntu
-            build_cmd: npm run build:linux-standalone
-            config: electron-builder-linux.yml
-            artifact_pattern: dist-linux/*
-
-    runs-on: ${{ matrix.platform }}-latest
+  # Windows 构建（Intel/AMD x64）
+  build-win:
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-
       - name: Install dependencies
         run: npm ci
-
       - name: Build
-        run: ${{ matrix.build_cmd }}
+        run: npm run build:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Release Asset
+      - name: Upload
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ matrix.artifact_pattern }}
+          files: release/*.exe
           draft: false
-          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # macOS 构建（Intel x64）— 必须在 macOS runner 上运行才能生成 Mac 引擎
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build:mac-standalone
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-mac/*
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Linux 构建
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build:linux-standalone
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-linux/*
+          draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
