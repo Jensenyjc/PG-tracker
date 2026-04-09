@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: main/index.ts
+ * @Description: Electron 主进程入口，负责数据库初始化、IPC 处理器注册、窗口管理及系统集成
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join, dirname } from 'path'
 import { existsSync, copyFileSync, unlinkSync, mkdirSync, writeFileSync } from 'fs'
@@ -133,10 +141,17 @@ async function getPrisma(): Promise<any> {
   const dbUrl = `file:${dbPath}`
 
   // 多路径搜索 query engine，兼容不同打包结构
+  // 根据平台动态选择查询引擎文件名
+  const engineExt = platform === 'win32'
+    ? 'dll.node'
+    : platform === 'darwin'
+      ? 'dylib'
+      : 'so'
+  const engineName = `query_engine-${platform}.${engineExt}`
   const engineCandidates = [
-    join(prismaPath, 'query_engine-windows.dll.node'),
-    join(process.resourcesPath, 'node_modules', '@prisma', 'engines', 'query_engine-windows.dll.node'),
-    join(process.resourcesPath, '.prisma', 'client', 'query_engine-windows.dll.node')
+    join(prismaPath, engineName),
+    join(process.resourcesPath, 'node_modules', '@prisma', 'engines', engineName),
+    join(process.resourcesPath, '.prisma', 'client', engineName)
   ]
   let engineFile = engineCandidates[0] // 默认
   for (const candidate of engineCandidates) {
