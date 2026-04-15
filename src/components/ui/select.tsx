@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: select.tsx
+ * @Description: 通用选择器组件，基于 Radix UI Select 和 Tailwind CSS 构建，支持触发器、内容、选项等
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import * as React from 'react'
 import * as SelectPrimitive from '@radix-ui/react-select'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'

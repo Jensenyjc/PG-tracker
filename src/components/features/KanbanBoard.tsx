@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: KanbanBoard.tsx
+ * @Description: 院校申请看板页面，以冲/稳/保三列视图展示目标院校，支持按等级筛选
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useStore, Institution } from '../../stores/appStore'

@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: Dashboard.tsx
+ * @Description: 总览仪表板页面，展示院校/导师/任务统计、截止日期预警、三分类院校速览
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import { useMemo, useEffect } from 'react'
 import { format, isPast, differenceInDays } from 'date-fns'
 import { zhCN } from 'date-fns/locale'

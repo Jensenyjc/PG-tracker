@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: InterviewForm.tsx
+ * @Description: 面经记录表单，用于记录导师面试详情，包含面试日期、形式及 Markdown 格式的面经内容
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import { useState } from 'react'
 import { useStore } from '../../stores/appStore'
 import { Button } from '../ui/button'

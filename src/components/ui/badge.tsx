@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: badge.tsx
+ * @Description: 通用 Badge 徽章组件，基于 Radix UI 和 Tailwind CSS 构建，支持多种变体样式
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../../lib/utils'

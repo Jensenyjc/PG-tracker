@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: label.tsx
+ * @Description: 通用 Label 标签组件，基于 Radix UI Label 和 Tailwind CSS 构建
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import * as React from 'react'
 import * as LabelPrimitive from '@radix-ui/react-label'
 import { cva, type VariantProps } from 'class-variance-authority'

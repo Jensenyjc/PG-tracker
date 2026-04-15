@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: dropdown-menu.tsx
+ * @Description: 通用下拉菜单组件，基于 Radix UI DropdownMenu 和 Tailwind CSS 构建
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import * as React from 'react'
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import { Check, ChevronRight, Circle } from 'lucide-react'

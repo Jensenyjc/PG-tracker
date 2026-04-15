@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: AdvisorForm.tsx
+ * @Description: 导师表单组件，用于添加和编辑导师信息，包含姓名、职称、研究方向、邮箱、联系状态等
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import { useState } from 'react'
 import { useStore, Advisor } from '../../stores/appStore'
 import { Button } from '../ui/button'
@@ -85,7 +93,7 @@ export default function AdvisorForm({ institutionId, advisor, onClose }: Advisor
           </div>
           <div>
             <Label htmlFor="homepage">个人主页</Label>
-            <Input id="homepage" type="url" value={formData.homepage} onChange={(e) => setFormData((prev) => ({ ...prev, homepage: e.target.value }))} placeholder="如：https://www.university.edu.cn/~zhang" />
+            <Input id="homepage" type="text" value={formData.homepage} onChange={(e) => setFormData((prev) => ({ ...prev, homepage: e.target.value }))} placeholder="如：https://www.university.edu.cn/~zhang" />
           </div>
           <div>
             <Label>联系状态</Label>

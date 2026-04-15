@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: tabs.tsx
+ * @Description: 通用 Tabs 标签页组件，基于 Radix UI Tabs 和 Tailwind CSS 构建
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import * as React from 'react'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
 import { cn } from '../../lib/utils'

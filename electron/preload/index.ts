@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: preload/index.ts
+ * @Description: Electron 预加载脚本，向渲染进程暴露安全的 IPC 桥接接口
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import { contextBridge, ipcRenderer } from 'electron'
 
 // Electron API exposed to renderer

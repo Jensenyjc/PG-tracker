@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: button.tsx
+ * @Description: 通用 Button 组件，基于 Radix UI Slot 和 Tailwind CSS 构建，支持多种变体和尺寸
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'

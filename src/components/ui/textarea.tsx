@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: textarea.tsx
+ * @Description: 通用 Textarea 多行文本输入组件，基于 Radix UI 和 Tailwind CSS 构建
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import * as React from 'react'
 import { cn } from '../../lib/utils'
 

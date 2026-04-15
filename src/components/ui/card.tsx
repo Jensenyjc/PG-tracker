@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: card.tsx
+ * @Description: 通用 Card 卡片组件，基于 Tailwind CSS 构建，包含卡片头部、内容、标题、描述等子组件
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import * as React from 'react'
 import { cn } from '../../lib/utils'
 
