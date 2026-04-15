@@ -1,14 +1,27 @@
-import { Moon, Sun, Monitor, Database, Download, Upload, Trash2, Mail } from 'lucide-react'
+/**
+ * @Project: PG-Tracker
+ * @File: Settings.tsx
+ * @Description: 设置页面，提供主题切换、颜色主题选择、数据导入导出、数据清除及联系方式展示
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
+import { Moon, Sun, Monitor, Database, Download, Upload, Trash2, Mail, Palette } from 'lucide-react'
 import avatarUrl from '../../assets/avatar.jpg'
 import { useTheme } from 'next-themes'
+import { useColorTheme, colorThemes, type ColorTheme } from '../ColorThemeContext'
 import { useEffect, useState } from 'react'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Label } from '../ui/label'
+import { ConfirmDialog } from '../ui/confirm-dialog'
 
 export default function Settings(): JSX.Element {
   const { theme, setTheme } = useTheme()
+  const { colorTheme, setColorTheme } = useColorTheme()
   const [mounted, setMounted] = useState(false)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [showDoubleConfirm, setShowDoubleConfirm] = useState(false)
 
   // 避免水合不匹配
   useEffect(() => { setMounted(true) }, [])
@@ -90,10 +103,6 @@ export default function Settings(): JSX.Element {
   }
 
   const handleClearData = async (): Promise<void> => {
-    const confirmed = confirm('确定要清除所有数据吗？此操作不可恢复！')
-    if (!confirmed) return
-    const doubleConfirmed = confirm('这是最后一次确认，清除后所有数据将永久丢失！')
-    if (!doubleConfirmed) return
     try {
       const institutions = await window.api.institution.getAll()
       for (const inst of institutions) {
@@ -109,26 +118,90 @@ export default function Settings(): JSX.Element {
 
   return (
     <div className="h-full overflow-auto p-6">
+      <ConfirmDialog
+        open={showClearConfirm}
+        onOpenChange={(open) => {
+          setShowClearConfirm(open)
+          if (!open) setShowDoubleConfirm(false)
+        }}
+        title="清除所有数据"
+        description="确定要清除所有数据吗？此操作不可恢复！"
+        confirmText="继续"
+        variant="destructive"
+        onConfirm={() => setShowDoubleConfirm(true)}
+      />
+      <ConfirmDialog
+        open={showDoubleConfirm}
+        onOpenChange={setShowDoubleConfirm}
+        title="最终确认"
+        description="这是最后一次确认，清除后所有数据将永久丢失！建议先导出备份。"
+        confirmText="清除数据"
+        variant="destructive"
+        onConfirm={handleClearData}
+      />
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
           <h2 className="text-3xl font-bold">设置</h2>
           <p className="text-muted-foreground">管理应用偏好和数据</p>
         </div>
 
+        {/* 主题模式选择 */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">外观</CardTitle>
-            <CardDescription>自定义应用的外观效果</CardDescription>
+            <CardTitle className="text-lg font-semibold">外观模式</CardTitle>
+            <CardDescription>选择浅色或深色显示模式</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label className="mb-2 block">主题</Label>
+              <Label className="mb-2 block">显示模式</Label>
               <div className="flex gap-2">
                 <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="flex-1"><Sun className="h-4 w-4 mr-2" />浅色</Button>
                 <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} className="flex-1"><Moon className="h-4 w-4 mr-2" />深色</Button>
                 <Button variant={theme === 'system' ? 'default' : 'outline'} onClick={() => setTheme('system')} className="flex-1"><Monitor className="h-4 w-4 mr-2" />跟随系统</Button>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* 颜色主题选择 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold flex items-center gap-2"><Palette className="h-5 w-5" />颜色主题</CardTitle>
+            <CardDescription>选择你喜欢的颜色风格</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+              {colorThemes.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setColorTheme(t.id)}
+                  className={`relative p-3 rounded-lg border-2 transition-all hover:scale-105 ${
+                    colorTheme === t.id
+                      ? 'border-primary ring-2 ring-primary/20'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <div
+                      className="w-8 h-8 rounded-full shadow-md"
+                      style={{ backgroundColor: t.color }}
+                    />
+                    <span className="text-xs font-medium">{t.name}</span>
+                  </div>
+                  {colorTheme === t.id && (
+                    <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                      <svg className="w-2.5 h-2.5 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              当前选择：<span className="font-medium">{colorThemes.find(t => t.id === colorTheme)?.name}</span>
+              — {colorThemes.find(t => t.id === colorTheme)?.description}
+            </p>
           </CardContent>
         </Card>
 
@@ -143,7 +216,7 @@ export default function Settings(): JSX.Element {
               <Button variant="outline" onClick={handleImportData} className="flex-1"><Upload className="h-4 w-4 mr-2" />导入数据</Button>
             </div>
             <div className="pt-4 border-t">
-              <Button variant="destructive" onClick={handleClearData} className="w-full"><Trash2 className="h-4 w-4 mr-2" />清除所有数据</Button>
+              <Button variant="destructive" onClick={() => setShowClearConfirm(true)} className="w-full"><Trash2 className="h-4 w-4 mr-2" />清除所有数据</Button>
               <p className="text-xs text-muted-foreground text-center mt-2">清除后数据将永久丢失，请先导出备份</p>
             </div>
           </CardContent>
@@ -153,7 +226,7 @@ export default function Settings(): JSX.Element {
           <CardHeader><CardTitle className="text-lg font-semibold">关于</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <p><strong>PG-Tracker</strong> - 保研信息收集与决策分析系统</p>
-            <p>版本：2.2.1</p>
+            <p>版本：2.3.0</p>
             <p>数据存储：本地 SQLite 数据库</p>
             <p className="pt-2">本应用完全离线运行，所有数据均存储在本地设备上，保护你的隐私。</p>
           </CardContent>

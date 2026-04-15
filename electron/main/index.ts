@@ -18,13 +18,20 @@ const execAsync = promisify(exec)
 // ==================== 全局崩溃日志捕捉 ====================
 // 必须在最早期注册，确保任何未捕获的异常都能记录
 // 注意：dialog.showErrorBox 需要 app.ready 之后才能用，这里只写文件
+const getCrashLogPath = (): string => {
+  // 跨平台获取临时目录
+  const tempDir = process.platform === 'win32'
+    ? (process.env.TEMP || process.env.TMP || 'C:\\Windows\\Temp')
+    : '/tmp'
+  return join(tempDir, 'pg-tracker-crash.log')
+}
+
 process.on('uncaughtException', (error) => {
   const msg = `未捕获异常: ${error.message}\n\nStack: ${error.stack}`
   log.error('[CRASH]', msg)
   // 写日志文件，不在此处弹窗（app 可能还未 ready）
   try {
-    // 直接写固定路径，不依赖 app.getPath
-    const crashLogPath = '/tmp/pg-tracker-crash.log'
+    const crashLogPath = getCrashLogPath()
     writeFileSync(crashLogPath, `[${new Date().toISOString()}] ${msg}\n`, { flag: 'a' })
   } catch {}
   // 顶层异常必须退出，否则进程处于不可预期状态
@@ -35,7 +42,7 @@ process.on('unhandledRejection', (reason: any) => {
   const msg = `未处理的 Promise 拒绝: ${reason?.message || reason}\n\nStack: ${reason?.stack || '无堆栈信息'}`
   log.error('[CRASH]', msg)
   try {
-    const crashLogPath = '/tmp/pg-tracker-crash.log'
+    const crashLogPath = getCrashLogPath()
     writeFileSync(crashLogPath, `[${new Date().toISOString()}] ${msg}\n`, { flag: 'a' })
   } catch {}
 })
@@ -46,6 +53,7 @@ const platform = process.platform || 'win32'
 
 // ==================== Prisma Client 初始化 ====================
 let prisma: any = null
+let prismaInitPromise: Promise<any> | null = null  // 防止并发初始化
 
 /**
  * 获取数据库文件路径。
@@ -113,11 +121,11 @@ async function initializeDatabase(): Promise<string> {
   }
 
   // 覆盖安装场景：检测 EmailTemplate 表是否存在于用户数据库
+  let tmpPrisma: any = null
   try {
     const { PrismaClient: PC } = require(getPrismaClientPath())
-    const tmpPrisma = new PC({ datasources: { db: { url: `file:${userDbPath}` } } })
+    tmpPrisma = new PC({ datasources: { db: { url: `file:${userDbPath}` } } })
     await tmpPrisma.emailTemplate.findFirst({ select: { id: true } })
-    await tmpPrisma.$disconnect()
     log.info('[Prod] User database schema is up to date')
     return userDbPath
   } catch (err: any) {
@@ -130,65 +138,99 @@ async function initializeDatabase(): Promise<string> {
       log.info('[Prod] Database replaced successfully')
     }
     return userDbPath
+  } finally {
+    // 确保临时连接被关闭
+    if (tmpPrisma) {
+      try { await tmpPrisma.$disconnect() } catch {}
+    }
   }
 }
 
 async function getPrisma(): Promise<any> {
+  // 如果已经初始化完成，直接返回
   if (prisma) return prisma
 
-  const prismaPath = getPrismaClientPath()
-  const dbPath = getDatabasePath()
-  const dbUrl = `file:${dbPath}`
+  // 如果正在初始化中，等待现有初始化完成（防止竞态条件）
+  if (prismaInitPromise) return prismaInitPromise
 
-  // 多路径搜索 query engine，兼容不同打包结构
-  // 根据平台动态选择查询引擎文件名
-  const engineExt = platform === 'win32'
-    ? 'dll.node'
-    : platform === 'darwin'
-      ? 'dylib'
-      : 'so'
-  const engineName = `query_engine-${platform}.${engineExt}`
-  const engineCandidates = [
-    join(prismaPath, engineName),
-    join(process.resourcesPath, 'node_modules', '@prisma', 'engines', engineName),
-    join(process.resourcesPath, '.prisma', 'client', engineName)
-  ]
-  let engineFile = engineCandidates[0] // 默认
-  for (const candidate of engineCandidates) {
-    if (existsSync(candidate)) {
-      engineFile = candidate
-      break
+  // 开始初始化
+  prismaInitPromise = (async () => {
+    const prismaPath = getPrismaClientPath()
+    const dbPath = getDatabasePath()
+    const dbUrl = `file:${dbPath}`
+
+    // 多路径搜索 query engine，兼容不同打包结构
+    // Prisma 引擎文件命名规则：
+    // - Windows: query_engine-windows.dll.node
+    // - macOS Intel: libquery_engine-darwin.dylib.node
+    // - macOS ARM: libquery_engine-darwin-arm64.dylib.node
+    // - Linux: libquery_engine-debian-openssl-*.so.node
+    // 注意：Windows 使用 'windows' 而非 'win32'，macOS/Linux 使用 'libquery_engine' 前缀
+    const getEngineNames = (): string[] => {
+      if (platform === 'win32') {
+        return ['query_engine-windows.dll.node']
+      } else if (platform === 'darwin') {
+        return [
+          'libquery_engine-darwin-arm64.dylib.node',
+          'libquery_engine-darwin.dylib.node'
+        ]
+      } else {
+        // Linux
+        return [
+          'libquery_engine-debian-openssl-3.0.x.so.node',
+          'libquery_engine-debian-openssl-1.1.x.so.node'
+        ]
+      }
     }
-  }
+    const engineNames = getEngineNames()
+    const engineCandidates: string[] = []
+    for (const engineName of engineNames) {
+      engineCandidates.push(
+        join(prismaPath, engineName),
+        join(process.resourcesPath, 'node_modules', '@prisma', 'engines', engineName),
+        join(process.resourcesPath, '.prisma', 'client', engineName)
+      )
+    }
+    let engineFile: string | null = null
+    for (const candidate of engineCandidates) {
+      if (existsSync(candidate)) {
+        engineFile = candidate
+        break
+      }
+    }
 
-  log.info('=== Prisma Init ===')
-  log.info('  Prisma Client path:', prismaPath)
-  log.info('  Database URL (explicit):', dbUrl)
-  log.info('  app.isPackaged:', app.isPackaged)
-  log.info('  query engine path:', engineFile)
-  log.info('  query engine exists:', existsSync(engineFile))
+    log.info('=== Prisma Init ===')
+    log.info('  Prisma Client path:', prismaPath)
+    log.info('  Database URL (explicit):', dbUrl)
+    log.info('  app.isPackaged:', app.isPackaged)
+    log.info('  query engine path:', engineFile)
+    log.info('  query engine exists:', engineFile ? existsSync(engineFile) : false)
 
-  if (!isDev) {
-    process.env.PRISMA_QUERY_ENGINE_LIBRARY = engineFile
-  }
+    if (!isDev && engineFile) {
+      process.env.PRISMA_QUERY_ENGINE_LIBRARY = engineFile
+    }
 
-  if (!isDev && !existsSync(engineFile)) {
-    const msg = `Prisma 查询引擎未找到！\n搜索路径:\n${engineCandidates.map(p => '  - ' + p + ' (' + (existsSync(p) ? '存在' : '不存在') + ')').join('\n')}`
-    log.error(msg)
-    dialog.showErrorBox('PG-Tracker 启动失败', msg)
-  }
+    if (!isDev && !engineFile) {
+      const msg = `Prisma 查询引擎未找到！\n搜索路径:\n${engineCandidates.map(p => '  - ' + p + ' (' + (existsSync(p) ? '存在' : '不存在') + ')').join('\n')}`
+      log.error(msg)
+      dialog.showErrorBox('PG-Tracker 启动失败', msg)
+    }
 
-  try {
-    const { PrismaClient } = require(prismaPath)
-    // 显式传递 datasources.db.url，不再依赖 process.env.DATABASE_URL
-    prisma = new PrismaClient({
-      datasources: { db: { url: dbUrl } }
-    })
-  } catch (err) {
-    log.error('Failed to load Prisma Client:', err)
-    throw err
-  }
-  return prisma
+    try {
+      const { PrismaClient } = require(prismaPath)
+      // 显式传递 datasources.db.url，不再依赖 process.env.DATABASE_URL
+      prisma = new PrismaClient({
+        datasources: { db: { url: dbUrl } }
+      })
+    } catch (err) {
+      log.error('Failed to load Prisma Client:', err)
+      prismaInitPromise = null  // 重置以便重试
+      throw err
+    }
+    return prisma
+  })()
+
+  return prismaInitPromise
 }
 
 log.transports.file.level = 'info'
@@ -562,7 +604,9 @@ ipcMain.handle('interview:delete', async (_, id: string) => {
 
 ipcMain.handle('file:selectFile', async (_, options: any) => {
   try {
-    const result = await dialog.showOpenDialog(mainWindow!, {
+    // 使用当前焦点窗口或 BrowserWindow.getFocusedWindow() 作为 fallback
+    const targetWindow = mainWindow || BrowserWindow.getFocusedWindow()
+    const result = await dialog.showOpenDialog(targetWindow, {
       properties: ['openFile'],
       filters: options?.filters || [
         { name: 'Documents', extensions: ['pdf', 'doc', 'docx', 'tex'] },

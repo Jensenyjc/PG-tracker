@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: EmailTemplates.tsx
+ * @Description: 邮件模板编辑器，支持创建/编辑邮件模板、变量占位符插入、实时预览及一键复制
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Copy, Check, Mail, Edit2, Plus, Trash2, Save, X, Eye } from 'lucide-react'
 import { Button } from '../ui/button'
@@ -70,7 +78,7 @@ function extractVariables(text: string): string[] {
   return [...new Set(matches.map(m => m.replace(/\{\{|\}\}/g, '').trim()))]
 }
 
-// 预览渲染函数，支持 fillValues：已填值渲染为绿色，未填值渲染为蓝色占位符
+// 邮件预览渲染：已填变量值显示为绿色，未填显示为蓝色
 function renderPreviewText(text: string, fillValues: Record<string, string>): string {
   const escaped = text
     .replace(/&/g, '&amp;')
@@ -189,28 +197,23 @@ export default function EmailTemplates(): JSX.Element {
     })
   }
 
-  // 痛点三：打开填写弹窗，变量从当前正文中提取
   const handleOpenFillModal = (): void => {
     const vars = usedVariables
     setExtractedVars(vars)
-    // 用已保存的 fillValues 初始化弹窗表单
     const init: Record<string, string> = {}
     vars.forEach(v => { init[v] = fillValues[v] || '' })
     setFillValues(init)
     setIsFillModalOpen(true)
   }
 
-  // 弹窗内实时更新 fillValues（同时更新 localStorage 和右侧预览）
   const handleFillChange = (name: string, value: string): void => {
     setFillValues(prev => ({ ...prev, [name]: value }))
   }
 
-  // 痛点三：关闭弹窗只保存填写值，不复制
   const handleFillDone = (): void => {
     setIsFillModalOpen(false)
   }
 
-  // 痛点三：独立的一键复制按钮 — 把占位符替换为实际填值后复制
   const handleCopyFinal = useCallback(async (): Promise<void> => {
     let content = editedContent
     let subject = editedSubject

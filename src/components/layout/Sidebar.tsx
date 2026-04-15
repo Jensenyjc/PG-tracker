@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: Sidebar.tsx
+ * @Description: 左侧导航栏组件，提供总览、院校看板、日程、邮件模板、设置五个一级导航入口
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import { LayoutDashboard, Kanban, Calendar, Mail, Settings, GraduationCap } from 'lucide-react'
 
 type View = 'dashboard' | 'kanban' | 'timeline' | 'templates' | 'settings'
@@ -56,7 +64,7 @@ export default function Sidebar({ currentView, onViewChange, onSelectInstitution
 
       <div className="p-4 border-t border-border">
         <p className="text-xs text-muted-foreground text-center">
-          v2.2.1 - 本地数据存储
+          v2.3.0 - 本地数据存储
         </p>
       </div>
     </aside>

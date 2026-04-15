@@ -5,7 +5,7 @@
 一款专为中国大学生设计的跨平台保研申请管理桌面应用，支持 Windows、macOS、Linux 三大操作系统，帮助你系统化管理目标院校、导师信息、申请进度和面试记录，所有数据完全本地存储，保护隐私。
 
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Version](https://img.shields.io/badge/version-2.2.1-blue)
+![Version](https://img.shields.io/badge/version-2.3.0-blue)
 ![Electron](https://img.shields.io/badge/Electron-33.4-47848F)
 ![React](https://img.shields.io/badge/React-18.3-61DAFB)
 
@@ -72,7 +72,7 @@
 #### 下载
 
 1. 打开 [Releases](https://github.com/Jensenyjc/PG-tracker/releases) 页面
-2. 在最新版本（v2.2.1）的 Assets 中，找到 **`PG-Tracker-2.2.1-win-setup.exe`**
+2. 在最新版本（v2.3.0）的 Assets 中，找到 **`PG-Tracker-2.3.0-win-setup.exe`**
 3. 点击下载
 
 #### 安装与运行
@@ -94,9 +94,9 @@
 #### 下载
 
 1. 打开 [Releases](https://github.com/Jensenyjc/PG-tracker/releases) 页面
-2. 在最新版本（v2.2.1）的 Assets 中，找到以下任意文件：
-   - **`PG-Tracker-2.2.1-mac-x64.dmg`** — 推荐，图形化安装界面
-   - **`PG-Tracker-2.2.1-mac-x64.zip`** — 便携版，无需安装
+2. 在最新版本（v2.3.0）的 Assets 中，找到以下任意文件：
+   - **`PG-Tracker-2.3.0-mac-x64.dmg`** — 推荐，图形化安装界面
+   - **`PG-Tracker-2.3.0-mac-x64.zip`** — 便携版，无需安装
 
 #### 安装步骤
 
@@ -146,9 +146,9 @@ macOS 默认只允许运行来自 App Store 的已签名应用，首次打开未
 #### 下载
 
 1. 打开 [Releases](https://github.com/Jensenyjc/PG-tracker/releases) 页面
-2. 在最新版本（v2.2.1）的 Assets 中，找到以下任意文件：
-   - **`PG-Tracker-2.2.1-linux-x64.AppImage`** — 推荐，便携免安装
-   - **`PG-Tracker-2.2.1-linux-x64.deb`** — Debian/Ubuntu 系专用安装包
+2. 在最新版本（v2.3.0）的 Assets 中，找到以下任意文件：
+   - **`PG-Tracker-2.3.0-linux-x64.AppImage`** — 推荐，便携免安装
+   - **`PG-Tracker-2.3.0-linux-x64.deb`** — Debian/Ubuntu 系专用安装包
 
 #### 安装步骤
 
@@ -163,7 +163,7 @@ macOS 默认只允许运行来自 App Store 的已签名应用，首次打开未
    **终端方式：**
    ```bash
    cd ~/Downloads
-   chmod +x PG-Tracker-2.2.1-linux-x64.AppImage
+   chmod +x PG-Tracker-2.3.0-linux-x64.AppImage
    ```
 
 3. 双击文件即可运行，**无需安装**
@@ -174,7 +174,7 @@ macOS 默认只允许运行来自 App Store 的已签名应用，首次打开未
 2. 点击"安装"，输入密码，等待安装完成
 3. 若遇到依赖问题，在终端运行以下命令修复：
    ```bash
-   sudo dpkg -i ~/Downloads/PG-Tracker-2.2.1-linux-x64.deb
+   sudo dpkg -i ~/Downloads/PG-Tracker-2.3.0-linux-x64.deb
    sudo apt-get install -f
    ```
 

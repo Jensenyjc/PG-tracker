@@ -1,6 +1,16 @@
+/**
+ * @Project: PG-Tracker
+ * @File: App.tsx
+ * @Description: 应用根组件，根据当前视图路由渲染对应页面，集成主题和布局
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import { useEffect } from 'react'
+import { Loader2 } from 'lucide-react'
 import { useStore } from './stores/appStore'
 import ThemeProvider from './components/ThemeProvider'
+import { ColorThemeProvider } from './components/ColorThemeContext'
 import Sidebar from './components/layout/Sidebar'
 import KanbanBoard from './components/features/KanbanBoard'
 import InstitutionDetail from './components/features/InstitutionDetail'
@@ -10,7 +20,7 @@ import Settings from './components/features/Settings'
 import Dashboard from './components/features/Dashboard'
 
 function App(): JSX.Element {
-  const { currentView, selectedInstitutionId, setView, setSelectedInstitutionId, loadInstitutions, institutions } = useStore()
+  const { currentView, selectedInstitutionId, setView, setSelectedInstitutionId, loadInstitutions, institutions, isLoading } = useStore()
 
   useEffect(() => {
     loadInstitutions()
@@ -27,6 +37,18 @@ function App(): JSX.Element {
   }
 
   const renderContent = (): JSX.Element => {
+    // 显示加载状态
+    if (isLoading && institutions.length === 0) {
+      return (
+        <div className="h-full flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">加载中...</p>
+          </div>
+        </div>
+      )
+    }
+
     if (selectedInstitutionId) {
       const exists = institutions.some((i) => i.id === selectedInstitutionId)
       if (exists) {
@@ -53,16 +75,18 @@ function App(): JSX.Element {
 
   return (
     <ThemeProvider>
-    <div className="flex h-screen bg-background">
-      <Sidebar
-        currentView={currentView}
-        onViewChange={setView}
-        onSelectInstitution={handleSelectInstitution}
-      />
-      <main className="flex-1 overflow-hidden">
-        {renderContent()}
-      </main>
-    </div>
+      <ColorThemeProvider>
+        <div className="flex h-screen bg-background">
+          <Sidebar
+            currentView={currentView}
+            onViewChange={setView}
+            onSelectInstitution={handleSelectInstitution}
+          />
+          <main className="flex-1 overflow-hidden">
+            {renderContent()}
+          </main>
+        </div>
+      </ColorThemeProvider>
     </ThemeProvider>
   )
 }

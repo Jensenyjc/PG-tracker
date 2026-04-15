@@ -4,6 +4,47 @@
 
 ---
 
+## [v2.3.0] - 2026-04-15
+
+### 新功能
+
+#### 颜色主题系统
+- 新增 7 种颜色主题选择：默认蓝、Claude橙、自然绿、玫瑰粉、VSCode紫、海洋青、石板灰
+- Claude橙使用 Claude 品牌色 `#D97757`
+- VSCode紫使用 VS Code 紫色 `#C586C0`
+- 颜色主题与浅色/深色模式独立，支持任意组合
+- 设置页面新增颜色主题选择卡片，带可视化预览
+
+#### 学位类型扩展
+- 学位类型新增"专硕"选项（原只有学硕、直博）
+
+### 问题修复
+
+#### Electron 主进程稳定性
+- 修复 Windows 崩溃日志路径错误：使用跨平台临时目录
+- 修复 Prisma 初始化竞态条件：添加 `prismaInitPromise` 防止并发初始化
+- 修复 mainWindow 空指针风险：使用 fallback 窗口
+- 修复临时数据库连接泄漏：使用 `try-finally` 确保连接关闭
+- 修复 Prisma 查询引擎文件名错误（`win32` → `windows`）
+
+#### IPC 响应格式
+- 统一 IPC 响应格式类型定义，添加 `ApiResponse<T>` 类型
+
+### 改进
+
+#### 代码优化
+- 提取共享常量到 `src/lib/constants.ts`（tierColors、degreeTypeLabels、contactStatusConfig）
+- 创建工具函数 `parsePolicyTags`、`formatDate`、`getDaysUntilDeadline`
+- 替换浏览器 `alert`/`confirm` 为应用内 Dialog 组件
+- 添加应用启动加载状态动画
+- Timeline 使用 `useMemo` 优化性能
+
+#### UI 改进
+- 新增 AlertDialog 和 ConfirmDialog 组件
+- 删除操作使用确认对话框，双确认机制更安全
+
+---
+
 ## [v2.2.1] - 2026-04-08
 
 ### 问题修复

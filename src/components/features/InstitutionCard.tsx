@@ -1,23 +1,25 @@
+/**
+ * @Project: PG-Tracker
+ * @File: InstitutionCard.tsx
+ * @Description: 院校卡片组件，在看板中展示单个院校的简要信息（名称、等级、截止日期、导师数）
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import { format, isPast, differenceInDays } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { Calendar, AlertCircle, Edit2, Mail, Users } from 'lucide-react'
 import { Institution } from '../../stores/appStore'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
+import { tierColors, tierLabels, degreeTypeLabels } from '../../lib/constants'
+import { parsePolicyTags } from '../../lib/utils'
 
 interface InstitutionCardProps {
   institution: Institution
   onClick: () => void
   onEdit: () => void
 }
-
-const tierColors = {
-  REACH: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  MATCH: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-  SAFETY: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-}
-
-const degreeTypeLabels = { MASTER: '学硕', PHD: '直博' }
 
 export default function InstitutionCard({ institution, onClick, onEdit }: InstitutionCardProps): JSX.Element {
   const deadline = institution.campDeadline || institution.pushDeadline
@@ -33,8 +35,7 @@ export default function InstitutionCard({ institution, onClick, onEdit }: Instit
   }
 
   const deadlineStatus = getDeadlineStatus()
-  let policyTags: string[] = []
-  try { policyTags = institution.policyTags ? JSON.parse(institution.policyTags) : [] } catch { /* malformed JSON, ignore */ }
+  const policyTags = parsePolicyTags(institution.policyTags)
 
   return (
     <div
@@ -55,7 +56,7 @@ export default function InstitutionCard({ institution, onClick, onEdit }: Instit
 
       <div className="flex flex-wrap gap-1 mb-2">
         <Badge variant="secondary" className={`text-xs ${tierColors[institution.tier]}`}>
-          {institution.tier === 'REACH' ? '冲' : institution.tier === 'MATCH' ? '稳' : '保'}
+          {tierLabels[institution.tier]}
         </Badge>
         <Badge variant="outline" className="text-xs">
           {degreeTypeLabels[institution.degreeType]}

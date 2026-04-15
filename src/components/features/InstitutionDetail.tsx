@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: InstitutionDetail.tsx
+ * @Description: 院校详情页，展示院校基本信息、导师列表及任务列表，支持导师联系状态管理和面经记录
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
@@ -7,6 +15,9 @@ import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '../ui/dropdown-menu'
+import { ConfirmDialog } from '../ui/confirm-dialog'
+import { tierColors, tierLabels, degreeTypeLabels, contactStatusConfig } from '../../lib/constants'
+import { parsePolicyTags } from '../../lib/utils'
 import AdvisorForm from './AdvisorForm'
 import TaskForm from './TaskForm'
 import InterviewForm from './InterviewForm'
@@ -17,22 +28,13 @@ interface InstitutionDetailProps {
   onBack: () => void
 }
 
-const tierColors = { REACH: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', MATCH: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400', SAFETY: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' }
-const advisorStatusConfig: Record<string, { label: string; dot: string; badge: string }> = {
-  PENDING:   { label: '未联系', dot: 'bg-gray-400',          badge: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' },
-  SENT:      { label: '已发送', dot: 'bg-blue-500',          badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
-  REPLIED:   { label: '已回复', dot: 'bg-purple-500',       badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' },
-  INTERVIEW: { label: '面试中', dot: 'bg-amber-500',        badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
-  REJECTED:  { label: '已拒绝', dot: 'bg-red-400',          badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
-  ACCEPTED:  { label: '已接受', dot: 'bg-green-500',        badge: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
-}
-
 export default function InstitutionDetail({ institutionId, onBack }: InstitutionDetailProps): JSX.Element {
   const { institutions, deleteInstitution, updateTask, deleteTask, updateAdvisor, conflictWarnings, checkConflicts } = useStore()
   const [showAdvisorForm, setShowAdvisorForm] = useState(false)
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [showInterviewForm, setShowInterviewForm] = useState(false)
   const [showEditForm, setShowEditForm] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [selectedAdvisor, setSelectedAdvisor] = useState<Advisor | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [activeTab, setActiveTab] = useState('overview')
@@ -52,35 +54,45 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
   }, [institutionId, checkConflicts])
 
   const handleDelete = async (): Promise<void> => {
-    const advisorCount = institution.advisors?.length || 0
-    const taskCount = institution.tasks?.length || 0
-    const detail = [
-      advisorCount > 0 ? `${advisorCount} 位导师` : '',
-      taskCount > 0 ? `${taskCount} 个任务` : ''
-    ].filter(Boolean).join('、')
-    const extra = detail ? `\n\n关联的 ${detail} 也将被一并删除。` : ''
-    if (confirm(`确定要删除「${institution.name}」吗？此操作不可恢复。${extra}`)) {
-      await deleteInstitution(institutionId)
-      onBack()
-    }
+    await deleteInstitution(institutionId)
+    onBack()
   }
 
   const handleToggleTask = async (task: Task): Promise<void> => {
     await updateTask(task.id, { ...task, isCompleted: !task.isCompleted })
   }
 
-  let policyTags: string[] = []
-  try { policyTags = institution.policyTags ? JSON.parse(institution.policyTags) : [] } catch { /* malformed JSON, ignore */ }
+  const policyTags = parsePolicyTags(institution.policyTags)
+
+  // 构建删除确认描述
+  const advisorCount = institution.advisors?.length || 0
+  const taskCount = institution.tasks?.length || 0
+  const detail = [
+    advisorCount > 0 ? `${advisorCount} 位导师` : '',
+    taskCount > 0 ? `${taskCount} 个任务` : ''
+  ].filter(Boolean).join('、')
+  const deleteDescription = detail
+    ? `确定要删除「${institution.name}」吗？此操作不可恢复。关联的 ${detail} 也将被一并删除。`
+    : `确定要删除「${institution.name}」吗？此操作不可恢复。`
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="删除院校"
+        description={deleteDescription}
+        confirmText="删除"
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
       <header className="p-4 border-b border-border bg-card">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h2 className="text-2xl font-bold">{institution.name}</h2>
-              <Badge className={tierColors[institution.tier]}>{institution.tier === 'REACH' ? '冲' : institution.tier === 'MATCH' ? '稳' : '保'}</Badge>
+              <Badge className={tierColors[institution.tier]}>{tierLabels[institution.tier]}</Badge>
             </div>
             <p className="text-sm text-muted-foreground">{institution.department}</p>
           </div>
@@ -88,7 +100,7 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
             <Button variant="outline" size="sm" onClick={() => setShowTaskForm(true)}><Plus className="h-4 w-4 mr-1" />添加任务</Button>
             <Button variant="outline" size="sm" onClick={() => setShowAdvisorForm(true)}><Plus className="h-4 w-4 mr-1" />添加导师</Button>
             <Button variant="ghost" size="icon" onClick={() => setShowEditForm(true)} title="编辑院校"><Edit2 className="h-4 w-4" /></Button>
-            <Button variant="ghost" size="icon" onClick={handleDelete} title="删除院校" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(true)} title="删除院校" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
           </div>
         </div>
       </header>
@@ -115,14 +127,7 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
           </div>
 
           <TabsContent value="overview" className="p-4 space-y-4">
-            {/*
-              布局结构：
-              - 顶部：基本信息（100% 宽，带细边框面板）
-              - 下方：导师预览 + 任务预览（grid grid-cols-2，左右各 50%，gap-6）
-              - policyTags 并入基本信息面板，不单独成区
-            */}
-
-            {/* ── 基本信息面板 ── */}
+            {/* 基本信息面板 */}
             <div className="border border-border rounded-lg p-5 bg-white dark:bg-transparent">
               <div className="flex items-center gap-2 mb-4">
                 <Building2 className="h-4 w-4 text-muted-foreground" />
@@ -131,7 +136,7 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
               <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-muted-foreground">学位类型：</span>
-                  <span className="font-medium">{institution.degreeType === 'MASTER' ? '学硕' : '直博'}</span>
+                  <span className="font-medium">{degreeTypeLabels[institution.degreeType]}</span>
                 </div>
                 {institution.expectedQuota && (
                   <div className="flex items-center gap-2 text-sm">

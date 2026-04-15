@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: InstitutionForm.tsx
+ * @Description: 院校表单组件，用于添加和编辑院校信息，包含名称、院系、等级、学位类型、截止日期等字段
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { useStore, Institution } from '../../stores/appStore'
@@ -6,6 +14,8 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Tier, DegreeType, tierDescriptions, degreeTypeLabels } from '../../lib/constants'
+import { parsePolicyTags } from '../../lib/utils'
 
 interface InstitutionFormProps {
   institution?: Institution | null
@@ -25,14 +35,14 @@ export default function InstitutionForm({ institution, onClose, onSuccess }: Ins
         campDeadline: institution.campDeadline || '',
         pushDeadline: institution.pushDeadline || '',
         expectedQuota: institution.expectedQuota || undefined,
-        policyTags: (() => { try { return institution.policyTags ? JSON.parse(institution.policyTags) : [] } catch { return [] } })() as string[]
+        policyTags: parsePolicyTags(institution.policyTags)
       }
     }
     return {
       name: '',
       department: '',
-      tier: 'MATCH' as 'REACH' | 'MATCH' | 'SAFETY',
-      degreeType: 'MASTER' as 'MASTER' | 'PHD',
+      tier: 'MATCH' as Tier,
+      degreeType: 'MASTER' as DegreeType,
       campDeadline: '',
       pushDeadline: '',
       expectedQuota: undefined as number | undefined,
@@ -115,22 +125,23 @@ export default function InstitutionForm({ institution, onClose, onSuccess }: Ins
             </div>
             <div>
               <Label htmlFor="inst-tier">申请层次</Label>
-              <Select value={formData.tier} onValueChange={(value) => setFormData(prev => ({ ...prev, tier: value as 'REACH' | 'MATCH' | 'SAFETY' }))}>
+              <Select value={formData.tier} onValueChange={(value) => setFormData(prev => ({ ...prev, tier: value as Tier }))}>
                 <SelectTrigger id="inst-tier"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="REACH">冲 — 超出自身水平</SelectItem>
-                  <SelectItem value="MATCH">稳 — 匹配自身水平</SelectItem>
-                  <SelectItem value="SAFETY">保 — 保底选择</SelectItem>
+                  <SelectItem value="REACH">{tierDescriptions.REACH}</SelectItem>
+                  <SelectItem value="MATCH">{tierDescriptions.MATCH}</SelectItem>
+                  <SelectItem value="SAFETY">{tierDescriptions.SAFETY}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label htmlFor="inst-degree">学位类型</Label>
-              <Select value={formData.degreeType} onValueChange={(value) => setFormData(prev => ({ ...prev, degreeType: value as 'MASTER' | 'PHD' }))}>
+              <Select value={formData.degreeType} onValueChange={(value) => setFormData(prev => ({ ...prev, degreeType: value as DegreeType }))}>
                 <SelectTrigger id="inst-degree"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="MASTER">学硕</SelectItem>
-                  <SelectItem value="PHD">直博</SelectItem>
+                  <SelectItem value="MASTER">{degreeTypeLabels.MASTER}</SelectItem>
+                  <SelectItem value="PROFESSIONAL">{degreeTypeLabels.PROFESSIONAL}</SelectItem>
+                  <SelectItem value="PHD">{degreeTypeLabels.PHD}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

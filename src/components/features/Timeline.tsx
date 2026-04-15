@@ -1,4 +1,12 @@
-import { useState, useEffect } from 'react'
+/**
+ * @Project: PG-Tracker
+ * @File: Timeline.tsx
+ * @Description: 日程时间线页面，统一展示夏令营截止、预推免截止和普通任务，按已过期/今天/明天/本周/即将到来分组
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
+import { useState, useEffect, useMemo } from 'react'
 import { format, isPast, isToday, isTomorrow, isThisWeek } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { Calendar, Clock, AlertCircle, CheckCircle2, Circle, ArrowRight, Plus, X, Edit2, Trash2 } from 'lucide-react'
@@ -8,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import { ConfirmDialog } from '../ui/confirm-dialog'
 
 interface TimelineProps {
   institutions: Institution[]
@@ -29,6 +38,10 @@ export default function Timeline({ institutions }: TimelineProps): JSX.Element {
   const [editTitle, setEditTitle] = useState('')
   const [editDate, setEditDate] = useState('')
 
+  // 删除确认对话框
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null)
+
   // 乐观更新用的本地映射：taskId → isCompleted
   // 初始化时从 store 同步，之后独立维护
   const [orphanTaskCompletion, setOrphanTaskCompletion] = useState<Record<string, boolean>>({})
@@ -42,7 +55,8 @@ export default function Timeline({ institutions }: TimelineProps): JSX.Element {
 
   useEffect(() => { loadOrphanTasks() }, [])
 
-  const timelineEvents = (() => {
+  // 使用 useMemo 优化性能，避免每帧重算
+  const timelineEvents = useMemo(() => {
     const events: Array<{
       id: string; title: string; type: ScheduleType; date: string
       institution: Institution | null; completed?: boolean; taskId?: string
@@ -70,9 +84,9 @@ export default function Timeline({ institutions }: TimelineProps): JSX.Element {
       taskId: task.id
     }))
     return events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-  })()
+  }, [institutions, orphanTasks, orphanTaskCompletion])
 
-  const groupedEvents = (() => {
+  const groupedEvents = useMemo(() => {
     const groups: Record<string, typeof timelineEvents> = { overdue: [], today: [], tomorrow: [], thisWeek: [], upcoming: [] }
     timelineEvents.forEach((event) => {
       const date = new Date(event.date)
@@ -83,7 +97,7 @@ export default function Timeline({ institutions }: TimelineProps): JSX.Element {
       else groups.upcoming.push(event)
     })
     return groups
-  })()
+  }, [timelineEvents])
 
   const getDateLabel = (date: string): { label: string; color: string } => {
     const d = new Date(date)
@@ -142,9 +156,13 @@ export default function Timeline({ institutions }: TimelineProps): JSX.Element {
   }
 
   const handleDeleteTask = async (taskId: string): Promise<void> => {
-    if (!confirm('确定删除此任务？')) return
     await deleteTask(taskId)
     await loadOrphanTasks()
+  }
+
+  const confirmDeleteTask = (taskId: string): void => {
+    setTaskToDelete(taskId)
+    setDeleteConfirmOpen(true)
   }
 
   const handleOpenEdit = (task: Task): void => {
@@ -171,6 +189,15 @@ export default function Timeline({ institutions }: TimelineProps): JSX.Element {
 
   return (
     <div className="h-full overflow-auto p-6">
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="删除任务"
+        description="确定要删除此任务吗？此操作不可恢复。"
+        confirmText="删除"
+        variant="destructive"
+        onConfirm={() => taskToDelete && handleDeleteTask(taskToDelete)}
+      />
       <div className="max-w-4xl mx-auto space-y-6">
 
         {/* Header */}
@@ -293,7 +320,7 @@ export default function Timeline({ institutions }: TimelineProps): JSX.Element {
                                 <Edit2 className="h-4 w-4 text-muted-foreground" />
                               </button>
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleDeleteTask(event.taskId!) }}
+                                onClick={(e) => { e.stopPropagation(); confirmDeleteTask(event.taskId!) }}
                                 className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
                                 title="删除"
                               >

@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 @layer base {
+  /* ==================== 基础浅色主题 ==================== */
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
@@ -26,6 +27,135 @@
     --radius: 0.5rem;
   }
 
+  /* ==================== 颜色主题 - 浅色模式 ==================== */
+
+  /* 温暖主题 - Claude 同款橙色 */
+  [data-theme="warm"] {
+    --background: 17 30% 98%;
+    --foreground: 17 14% 10%;
+    --card: 17 30% 98%;
+    --card-foreground: 17 14% 10%;
+    --popover: 17 30% 98%;
+    --popover-foreground: 17 14% 10%;
+    --primary: 17 62% 59%;  /* Claude 品牌色 #D97757 */
+    --primary-foreground: 17 30% 98%;
+    --secondary: 17 30% 90%;
+    --secondary-foreground: 17 14% 20%;
+    --muted: 17 30% 90%;
+    --muted-foreground: 17 10% 40%;
+    --accent: 17 50% 70%;
+    --accent-foreground: 17 14% 10%;
+    --border: 17 20% 85%;
+    --input: 17 20% 85%;
+    --ring: 17 62% 59%;
+  }
+
+  /* 自然主题 - 绿色 */
+  [data-theme="nature"] {
+    --background: 120 30% 98%;
+    --foreground: 120 10% 10%;
+    --card: 120 30% 98%;
+    --card-foreground: 120 10% 10%;
+    --popover: 120 30% 98%;
+    --popover-foreground: 120 10% 10%;
+    --primary: 142 70% 45%;
+    --primary-foreground: 120 30% 98%;
+    --secondary: 120 20% 90%;
+    --secondary-foreground: 120 10% 20%;
+    --muted: 120 20% 90%;
+    --muted-foreground: 120 10% 40%;
+    --accent: 142 50% 60%;
+    --accent-foreground: 120 10% 10%;
+    --border: 120 15% 85%;
+    --input: 120 15% 85%;
+    --ring: 142 70% 45%;
+  }
+
+  /* 玫瑰主题 - 粉红色 */
+  [data-theme="rose"] {
+    --background: 340 50% 98%;
+    --foreground: 340 20% 10%;
+    --card: 340 50% 98%;
+    --card-foreground: 340 20% 10%;
+    --popover: 340 50% 98%;
+    --popover-foreground: 340 20% 10%;
+    --primary: 340 80% 55%;
+    --primary-foreground: 340 50% 98%;
+    --secondary: 340 30% 90%;
+    --secondary-foreground: 340 20% 20%;
+    --muted: 340 30% 90%;
+    --muted-foreground: 340 10% 40%;
+    --accent: 340 60% 70%;
+    --accent-foreground: 340 20% 10%;
+    --border: 340 20% 85%;
+    --input: 340 20% 85%;
+    --ring: 340 80% 55%;
+  }
+
+  /* 紫罗兰主题 - VS Code 同款紫色 */
+  [data-theme="violet"] {
+    --background: 305 15% 98%;
+    --foreground: 305 10% 10%;
+    --card: 305 15% 98%;
+    --card-foreground: 305 10% 10%;
+    --popover: 305 15% 98%;
+    --popover-foreground: 305 10% 10%;
+    --primary: 305 35% 65%;  /* VS Code 紫色 #C586C0 */
+    --primary-foreground: 305 15% 98%;
+    --secondary: 305 15% 90%;
+    --secondary-foreground: 305 10% 20%;
+    --muted: 305 15% 90%;
+    --muted-foreground: 305 8% 40%;
+    --accent: 305 25% 70%;
+    --accent-foreground: 305 10% 10%;
+    --border: 305 12% 85%;
+    --input: 305 12% 85%;
+    --ring: 305 35% 65%;
+  }
+
+  /* 海洋主题 - 青色 */
+  [data-theme="ocean"] {
+    --background: 190 30% 98%;
+    --foreground: 190 20% 10%;
+    --card: 190 30% 98%;
+    --card-foreground: 190 20% 10%;
+    --popover: 190 30% 98%;
+    --popover-foreground: 190 20% 10%;
+    --primary: 190 80% 50%;
+    --primary-foreground: 190 30% 98%;
+    --secondary: 190 20% 90%;
+    --secondary-foreground: 190 20% 20%;
+    --muted: 190 20% 90%;
+    --muted-foreground: 190 10% 40%;
+    --accent: 190 60% 70%;
+    --accent-foreground: 190 20% 10%;
+    --border: 190 15% 85%;
+    --input: 190 15% 85%;
+    --ring: 190 80% 50%;
+  }
+
+  /* 石板灰主题 - 灰色 */
+  [data-theme="slate"] {
+    --background: 210 20% 98%;
+    --foreground: 210 10% 15%;
+    --card: 210 20% 98%;
+    --card-foreground: 210 10% 15%;
+    --popover: 210 20% 98%;
+    --popover-foreground: 210 10% 15%;
+    --primary: 210 30% 50%;
+    --primary-foreground: 210 20% 98%;
+    --secondary: 210 15% 90%;
+    --secondary-foreground: 210 10% 25%;
+    --muted: 210 15% 90%;
+    --muted-foreground: 210 8% 45%;
+    --accent: 210 20% 80%;
+    --accent-foreground: 210 10% 15%;
+    --border: 210 12% 85%;
+    --input: 210 12% 85%;
+    --ring: 210 30% 50%;
+  }
+
+  /* ==================== 基础深色主题 ==================== */
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
@@ -46,6 +176,136 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
+  }
+
+  /* ==================== 颜色主题 - 深色模式 ==================== */
+
+  /* 温暖主题 - 深色 */
+  /* 温暖主题 - Claude 同款橙色深色模式 */
+  .dark[data-theme="warm"] {
+    --background: 17 10% 8%;
+    --foreground: 17 20% 95%;
+    --card: 17 10% 8%;
+    --card-foreground: 17 20% 95%;
+    --popover: 17 10% 8%;
+    --popover-foreground: 17 20% 95%;
+    --primary: 17 62% 59%;  /* Claude 品牌色 #D97757 */
+    --primary-foreground: 17 10% 8%;
+    --secondary: 17 15% 15%;
+    --secondary-foreground: 17 20% 95%;
+    --muted: 17 15% 15%;
+    --muted-foreground: 17 10% 60%;
+    --accent: 17 40% 35%;
+    --accent-foreground: 17 20% 95%;
+    --border: 17 15% 20%;
+    --input: 17 15% 20%;
+    --ring: 17 62% 59%;
+  }
+
+  /* 自然主题 - 深色 */
+  .dark[data-theme="nature"] {
+    --background: 120 10% 8%;
+    --foreground: 120 20% 95%;
+    --card: 120 10% 8%;
+    --card-foreground: 120 20% 95%;
+    --popover: 120 10% 8%;
+    --popover-foreground: 120 20% 95%;
+    --primary: 142 70% 50%;
+    --primary-foreground: 120 10% 8%;
+    --secondary: 120 15% 15%;
+    --secondary-foreground: 120 20% 95%;
+    --muted: 120 15% 15%;
+    --muted-foreground: 120 10% 60%;
+    --accent: 142 50% 25%;
+    --accent-foreground: 120 20% 95%;
+    --border: 120 15% 20%;
+    --input: 120 15% 20%;
+    --ring: 142 70% 50%;
+  }
+
+  /* 玫瑰主题 - 深色 */
+  .dark[data-theme="rose"] {
+    --background: 340 20% 8%;
+    --foreground: 340 30% 95%;
+    --card: 340 20% 8%;
+    --card-foreground: 340 30% 95%;
+    --popover: 340 20% 8%;
+    --popover-foreground: 340 30% 95%;
+    --primary: 340 80% 60%;
+    --primary-foreground: 340 20% 8%;
+    --secondary: 340 25% 15%;
+    --secondary-foreground: 340 30% 95%;
+    --muted: 340 25% 15%;
+    --muted-foreground: 340 15% 60%;
+    --accent: 340 50% 30%;
+    --accent-foreground: 340 30% 95%;
+    --border: 340 25% 20%;
+    --input: 340 25% 20%;
+    --ring: 340 80% 60%;
+  }
+
+  /* 紫罗兰主题 - 深色 */
+  /* 紫罗兰主题 - VS Code 同款紫色深色模式 */
+  .dark[data-theme="violet"] {
+    --background: 305 8% 8%;
+    --foreground: 305 15% 95%;
+    --card: 305 8% 8%;
+    --card-foreground: 305 15% 95%;
+    --popover: 305 8% 8%;
+    --popover-foreground: 305 15% 95%;
+    --primary: 305 35% 65%;  /* VS Code 紫色 #C586C0 */
+    --primary-foreground: 305 8% 8%;
+    --secondary: 305 10% 15%;
+    --secondary-foreground: 305 15% 95%;
+    --muted: 305 10% 15%;
+    --muted-foreground: 305 8% 60%;
+    --accent: 305 20% 35%;
+    --accent-foreground: 305 15% 95%;
+    --border: 305 10% 20%;
+    --input: 305 10% 20%;
+    --ring: 305 35% 65%;
+  }
+
+  /* 海洋主题 - 深色 */
+  .dark[data-theme="ocean"] {
+    --background: 190 20% 8%;
+    --foreground: 190 30% 95%;
+    --card: 190 20% 8%;
+    --card-foreground: 190 30% 95%;
+    --popover: 190 20% 8%;
+    --popover-foreground: 190 30% 95%;
+    --primary: 190 80% 55%;
+    --primary-foreground: 190 20% 8%;
+    --secondary: 190 20% 15%;
+    --secondary-foreground: 190 30% 95%;
+    --muted: 190 20% 15%;
+    --muted-foreground: 190 15% 60%;
+    --accent: 190 50% 30%;
+    --accent-foreground: 190 30% 95%;
+    --border: 190 20% 20%;
+    --input: 190 20% 20%;
+    --ring: 190 80% 55%;
+  }
+
+  /* 石板灰主题 - 深色 */
+  .dark[data-theme="slate"] {
+    --background: 210 15% 8%;
+    --foreground: 210 20% 95%;
+    --card: 210 15% 8%;
+    --card-foreground: 210 20% 95%;
+    --popover: 210 15% 8%;
+    --popover-foreground: 210 20% 95%;
+    --primary: 210 40% 55%;
+    --primary-foreground: 210 15% 8%;
+    --secondary: 210 15% 18%;
+    --secondary-foreground: 210 20% 95%;
+    --muted: 210 15% 18%;
+    --muted-foreground: 210 12% 60%;
+    --accent: 210 25% 30%;
+    --accent-foreground: 210 20% 95%;
+    --border: 210 15% 22%;
+    --input: 210 15% 22%;
+    --ring: 210 40% 55%;
   }
 }
 

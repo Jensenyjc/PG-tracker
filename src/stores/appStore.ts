@@ -1,3 +1,11 @@
+/**
+ * @Project: PG-Tracker
+ * @File: appStore.ts
+ * @Description: 应用全局状态管理，通过 Zustand 管理院校、导师、任务、邮件模板等数据的增删改查及 UI 状态
+ * @Author: 杨敬诚
+ * @Date: 2026-04-08
+ * Copyright (c) 2026. All rights reserved.
+ */
 import { create } from 'zustand'
 
 export interface Institution {
@@ -5,7 +13,7 @@ export interface Institution {
   name: string
   department: string
   tier: 'REACH' | 'MATCH' | 'SAFETY'
-  degreeType: 'MASTER' | 'PHD'
+  degreeType: 'MASTER' | 'PROFESSIONAL' | 'PHD'
   campDeadline: string | null
   pushDeadline: string | null
   expectedQuota: number | null
