@@ -6,3 +6,8 @@ image/
 dist-win/
 dist-linux/
 dist-mac/
+
+# 用户数据 - 不要上传到 Git
+prisma/dev.db
+*.db
+*.db-journal
