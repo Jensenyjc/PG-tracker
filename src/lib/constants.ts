@@ -88,6 +88,9 @@ export const statusOptions: { value: ContactStatus; label: string }[] = [
   { value: 'ACCEPTED', label: '已录取' }
 ]
 
+// 别名导出，兼容 InstitutionDetail 中的引用
+export const advisorStatusConfig = contactStatusConfig
+
 // ==================== 面试形式 (Interview Format) ====================
 export type InterviewFormat = 'ONLINE' | 'OFFLINE'
 
