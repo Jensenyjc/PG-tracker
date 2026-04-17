@@ -63,6 +63,48 @@ export interface Interview {
   markdownNotes: string
 }
 
+export interface InstitutionInput {
+  name: string
+  department: string
+  tier: Institution['tier']
+  degreeType: Institution['degreeType']
+  campDeadline: string | Date | null
+  pushDeadline: string | Date | null
+  expectedQuota: number | null
+  policyTags: string[]
+}
+
+export interface AdvisorInput {
+  institutionId: string
+  name: string
+  title: string | null
+  researchArea: string
+  email: string
+  homepage: string | null
+  contactStatus: Advisor['contactStatus']
+  lastContactDate?: string | Date | null
+  reputationScore: number | null
+  notes: string | null
+}
+
+export interface TaskInput {
+  institutionId?: string
+  title: string
+  dueDate: string | Date
+  isCompleted: boolean
+}
+
+export type TaskUpdate = Partial<Omit<TaskInput, 'dueDate'>> & {
+  dueDate?: string | Date | null
+}
+
+export interface InterviewInput {
+  advisorId: string
+  date: string | Date
+  format: Interview['format']
+  markdownNotes: string
+}
+
 type View = 'dashboard' | 'kanban' | 'timeline' | 'templates' | 'settings'
 
 interface AppState {
@@ -78,19 +120,19 @@ interface AppState {
   setSelectedInstitutionId: (id: string | null) => void
   loadInstitutions: () => Promise<void>
   loadOrphanTasks: () => Promise<void>
-  addInstitution: (data: Omit<Institution, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Institution>
-  updateInstitution: (id: string, data: Partial<Institution>) => Promise<void>
+  addInstitution: (data: InstitutionInput) => Promise<Institution>
+  updateInstitution: (id: string, data: Partial<InstitutionInput>) => Promise<void>
   deleteInstitution: (id: string) => Promise<void>
-  addAdvisor: (data: Omit<Advisor, 'id'>) => Promise<Advisor>
-  updateAdvisor: (id: string, data: Partial<Advisor>) => Promise<void>
+  addAdvisor: (data: AdvisorInput) => Promise<Advisor>
+  updateAdvisor: (id: string, data: Partial<AdvisorInput>) => Promise<void>
   deleteAdvisor: (id: string) => Promise<void>
-  addTask: (data: { institutionId?: string; title: string; dueDate: Date; isCompleted: boolean }) => Promise<Task>
-  updateTask: (id: string, data: Partial<Task>) => Promise<void>
+  addTask: (data: TaskInput) => Promise<Task>
+  updateTask: (id: string, data: TaskUpdate) => Promise<void>
   deleteTask: (id: string) => Promise<void>
   addAsset: (data: Omit<Asset, 'id'>) => Promise<Asset>
   deleteAsset: (id: string) => Promise<void>
-  addInterview: (data: Omit<Interview, 'id'>) => Promise<Interview>
-  updateInterview: (id: string, data: Partial<Interview>) => Promise<void>
+  addInterview: (data: InterviewInput) => Promise<Interview>
+  updateInterview: (id: string, data: Partial<InterviewInput>) => Promise<void>
   deleteInterview: (id: string) => Promise<void>
   checkConflicts: (institutionId: string) => Promise<void>
   clearError: () => void

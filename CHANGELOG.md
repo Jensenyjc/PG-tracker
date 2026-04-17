@@ -4,6 +4,44 @@
 
 ---
 
+## [v2.3.2] - 2026-04-17
+
+### 问题修复
+
+#### TypeScript 类型安全增强
+- 修复 `InstitutionDetail.tsx` 中 `advisorStatusConfig` 未导入导致的空白页问题
+- 新增日期安全处理函数 `parseValidDate`、`formatDateSafe`、`renderStarRating`，防止无效日期导致渲染崩溃
+- 修复 `AdvisorForm.tsx` 联系状态类型转换，使用 `Advisor['contactStatus']` 类型约束
+- 修复 `InterviewForm.tsx` 面试形式类型转换，使用 `Interview['format']` 类型约束
+- 修复 `EmailTemplates.tsx` 删除模板未调用 store 方法的问题
+
+#### 状态管理类型优化
+- 新增输入类型接口：`InstitutionInput`、`AdvisorInput`、`TaskInput`、`TaskUpdate`、`InterviewInput`
+- 统一 store 方法参数类型，避免 `as any` 类型断言
+- 移除 `Timeline.tsx` 中未使用的 `updateTask` 导入
+
+#### Electron 主进程稳定性
+- 修复 `file:selectFile` handler 中 `dialog.showOpenDialog` 窗口参数处理
+- 添加 `OpenDialogOptions` 类型导入，增强类型安全
+- 支持 mainWindow 为 null 时的 fallback 处理
+
+#### UI 组件优化
+- 扩展 `StatusConfig` 接口，新增 `badge` 和 `dot` 属性用于状态下拉菜单样式
+- 为所有联系状态添加独立的徽章和圆点颜色配置
+- 移除未使用的导入：`dropdown-menu.tsx` 中的 `Check`、`ChevronRight`、`Circle`，`select.tsx` 中的 `ChevronUp`
+
+#### 构建配置
+- 修复 `tsconfig.node.json` 和 `tsconfig.web.json` 中 `ignoreDeprecations` 配置（6.0 → 5.0）
+- 新增 `src/assets.d.ts` 类型声明文件
+
+### 技术改进
+
+- 所有日期格式化使用 `formatDateSafe` 包装，防止 `Invalid Date` 渲染
+- 星级评分使用 `renderStarRating` 函数，增加数值边界检查
+- 代码风格统一：useEffect 回调使用 `void` 显式忽略 Promise
+
+---
+
 ## [v2.3.1] - 2026-04-16
 
 ### 问题修复

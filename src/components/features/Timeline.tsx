@@ -25,7 +25,7 @@ interface TimelineProps {
 type ScheduleType = 'camp' | 'push' | 'task'
 
 export default function Timeline({ institutions }: TimelineProps): JSX.Element {
-  const { setSelectedInstitutionId, setView, addTask, updateTask, deleteTask, updateInstitution, orphanTasks, loadOrphanTasks } = useStore()
+  const { setSelectedInstitutionId, setView, addTask, deleteTask, updateInstitution, orphanTasks, loadOrphanTasks } = useStore()
   const [showAddModal, setShowAddModal] = useState(false)
   const [newType, setNewType] = useState<ScheduleType>('task')
   const [newInstitutionId, setNewInstitutionId] = useState('')

@@ -7,7 +7,7 @@
     "src/preload/**/*"
   ],
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",   // ← 新增这行
+    "ignoreDeprecations": "5.0",
     "composite": true,
     "noEmit": false,
     "outDir": "./out/types",

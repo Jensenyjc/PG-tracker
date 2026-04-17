@@ -9,22 +9,23 @@
 import { Moon, Sun, Monitor, Database, Download, Upload, Trash2, Mail, Palette } from 'lucide-react'
 import avatarUrl from '../../assets/avatar.jpg'
 import { useTheme } from 'next-themes'
-import { useColorTheme, colorThemes, type ColorTheme } from '../ColorThemeContext'
+import { useColorTheme, colorThemes } from '../ColorThemeContext'
 import { useEffect, useState } from 'react'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Label } from '../ui/label'
 import { ConfirmDialog } from '../ui/confirm-dialog'
 
-export default function Settings(): JSX.Element {
+export default function Settings(): JSX.Element | null {
   const { theme, setTheme } = useTheme()
   const { colorTheme, setColorTheme } = useColorTheme()
   const [mounted, setMounted] = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [showDoubleConfirm, setShowDoubleConfirm] = useState(false)
 
-  // 避免水合不匹配
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   if (!mounted) return null
 

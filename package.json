@@ -1,6 +1,6 @@
 {
   "name": "pg-tracker",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "保研信息收集与决策分析系统",
   "author": "Jensenyjc <jensenyjc@example.com>",
   "main": "./out/main/index.js",

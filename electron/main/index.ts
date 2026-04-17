@@ -6,7 +6,7 @@
  * @Date: 2026-04-08
  * Copyright (c) 2026. All rights reserved.
  */
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, type OpenDialogOptions } from 'electron'
 import { join, dirname } from 'path'
 import { existsSync, copyFileSync, unlinkSync, mkdirSync, writeFileSync } from 'fs'
 import log from 'electron-log'
@@ -606,13 +606,16 @@ ipcMain.handle('file:selectFile', async (_, options: any) => {
   try {
     // 使用当前焦点窗口或 BrowserWindow.getFocusedWindow() 作为 fallback
     const targetWindow = mainWindow || BrowserWindow.getFocusedWindow()
-    const result = await dialog.showOpenDialog(targetWindow, {
+    const dialogOptions: OpenDialogOptions = {
       properties: ['openFile'],
       filters: options?.filters || [
         { name: 'Documents', extensions: ['pdf', 'doc', 'docx', 'tex'] },
         { name: 'All Files', extensions: ['*'] }
       ]
-    })
+    }
+    const result = targetWindow
+      ? await dialog.showOpenDialog(targetWindow, dialogOptions)
+      : await dialog.showOpenDialog(dialogOptions)
     return result.canceled ? null : result.filePaths[0]
   } catch (error) {
     log.error('Error selecting file:', error)

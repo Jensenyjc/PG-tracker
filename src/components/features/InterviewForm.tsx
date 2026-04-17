@@ -7,7 +7,7 @@
  * Copyright (c) 2026. All rights reserved.
  */
 import { useState } from 'react'
-import { useStore } from '../../stores/appStore'
+import { useStore, Interview } from '../../stores/appStore'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
@@ -22,7 +22,11 @@ interface InterviewFormProps {
 
 export default function InterviewForm({ advisorId, onClose }: InterviewFormProps): JSX.Element {
   const { addInterview } = useStore()
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    date: string
+    format: Interview['format']
+    markdownNotes: string
+  }>({
     date: new Date().toISOString().split('T')[0],
     format: 'ONLINE',
     markdownNotes: ''
@@ -54,7 +58,7 @@ export default function InterviewForm({ advisorId, onClose }: InterviewFormProps
           </div>
           <div>
             <Label>面试形式</Label>
-            <Select value={formData.format} onValueChange={(value) => setFormData((prev) => ({ ...prev, format: value }))}>
+            <Select value={formData.format} onValueChange={(value) => setFormData((prev) => ({ ...prev, format: value as Interview['format'] }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="ONLINE">线上</SelectItem>

@@ -21,7 +21,7 @@ interface AdvisorFormProps {
   onClose: () => void
 }
 
-const statusOptions = [
+const statusOptions: Array<{ value: Advisor['contactStatus']; label: string }> = [
   { value: 'PENDING', label: '未联系' },
   { value: 'SENT', label: '已发送' },
   { value: 'REPLIED', label: '已回复' },
@@ -56,7 +56,8 @@ export default function AdvisorForm({ institutionId, advisor, onClose }: Advisor
         researchArea: formData.researchArea.trim(),
         email: formData.email.trim(),
         homepage: formData.homepage.trim() || null,
-        contactStatus: formData.contactStatus as any,
+        contactStatus: formData.contactStatus,
+        lastContactDate: advisor?.lastContactDate || null,
         reputationScore: formData.reputationScore || null,
         notes: formData.notes.trim() || null
       }
@@ -97,7 +98,7 @@ export default function AdvisorForm({ institutionId, advisor, onClose }: Advisor
           </div>
           <div>
             <Label>联系状态</Label>
-            <Select value={formData.contactStatus} onValueChange={(value) => setFormData((prev) => ({ ...prev, contactStatus: value }))}>
+            <Select value={formData.contactStatus} onValueChange={(value) => setFormData((prev) => ({ ...prev, contactStatus: value as Advisor['contactStatus'] }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {statusOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}

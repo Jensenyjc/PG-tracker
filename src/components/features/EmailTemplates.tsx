@@ -246,7 +246,7 @@ export default function EmailTemplates(): JSX.Element {
 
   const handleDeleteTemplate = async (templateId: string): Promise<void> => {
     if (!confirm('确定删除此模板？')) return
-    await window.api.emailTemplate.delete(templateId)
+    await deleteEmailTemplate(templateId)
     await loadEmailTemplates()
     if (selectedTemplate?.id === templateId) setSelectedTemplate(null)
   }

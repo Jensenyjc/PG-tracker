@@ -9,14 +9,14 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
-import { ArrowLeft, Building2, Calendar, Users, Edit2, Trash2, Plus, Mail, ExternalLink, FileText, CheckCircle2, Circle, AlertTriangle, ArrowRight, ChevronDown, Check } from 'lucide-react'
-import { useStore, Institution, Advisor, Task } from '../../stores/appStore'
+import { ArrowLeft, Building2, Users, Edit2, Trash2, Plus, Mail, ExternalLink, FileText, CheckCircle2, Circle, AlertTriangle, ArrowRight, ChevronDown, Check } from 'lucide-react'
+import { useStore, Advisor, Task } from '../../stores/appStore'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '../ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../ui/dropdown-menu'
 import { ConfirmDialog } from '../ui/confirm-dialog'
-import { tierColors, tierLabels, degreeTypeLabels, contactStatusConfig } from '../../lib/constants'
+import { tierColors, tierLabels, degreeTypeLabels, advisorStatusConfig } from '../../lib/constants'
 import { parsePolicyTags } from '../../lib/utils'
 import AdvisorForm from './AdvisorForm'
 import TaskForm from './TaskForm'
@@ -26,6 +26,27 @@ import InstitutionForm from './InstitutionForm'
 interface InstitutionDetailProps {
   institutionId: string
   onBack: () => void
+}
+
+type DateLike = string | Date | null | undefined
+
+function parseValidDate(value: DateLike): Date | null {
+  if (!value) return null
+
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function formatDateSafe(value: DateLike, pattern: string, fallback = '--'): string {
+  const date = parseValidDate(value)
+  return date ? format(date, pattern, { locale: zhCN }) : fallback
+}
+
+function renderStarRating(score: number | null | undefined): string | null {
+  if (typeof score !== 'number' || !Number.isFinite(score)) return null
+
+  const normalized = Math.max(1, Math.min(5, Math.trunc(score)))
+  return `${'★'.repeat(normalized)}${'☆'.repeat(5 - normalized)}`
 }
 
 export default function InstitutionDetail({ institutionId, onBack }: InstitutionDetailProps): JSX.Element {
@@ -41,6 +62,12 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
 
   const institution = institutions.find((i) => i.id === institutionId)
 
+  useEffect(() => {
+    if (institutionId) {
+      void checkConflicts(institutionId)
+    }
+  }, [institutionId, checkConflicts])
+
   if (!institution) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -48,10 +75,6 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
       </div>
     )
   }
-
-  useEffect(() => {
-    if (institutionId) checkConflicts(institutionId)
-  }, [institutionId, checkConflicts])
 
   const handleDelete = async (): Promise<void> => {
     await deleteInstitution(institutionId)
@@ -63,6 +86,7 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
   }
 
   const policyTags = parsePolicyTags(institution.policyTags)
+  const advisorPreviewCount = institution.advisors?.length ?? 0
 
   // 构建删除确认描述
   const advisorCount = institution.advisors?.length || 0
@@ -147,13 +171,13 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
                 {institution.campDeadline && (
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-muted-foreground">夏令营截止：</span>
-                    <span className="font-medium">{format(new Date(institution.campDeadline), 'yyyy/MM/dd', { locale: zhCN })}</span>
+                    <span className="font-medium">{formatDateSafe(institution.campDeadline, 'yyyy/MM/dd')}</span>
                   </div>
                 )}
                 {institution.pushDeadline && (
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-muted-foreground">预推免截止：</span>
-                    <span className="font-medium">{format(new Date(institution.pushDeadline), 'yyyy/MM/dd', { locale: zhCN })}</span>
+                    <span className="font-medium">{formatDateSafe(institution.pushDeadline, 'yyyy/MM/dd')}</span>
                   </div>
                 )}
                 {policyTags.length > 0 && (
@@ -182,7 +206,7 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
                   <Users className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                   <h3 className="text-base font-semibold group-hover:text-primary transition-colors">导师预览</h3>
                   <span className="text-xs text-muted-foreground group-hover:text-primary ml-1 transition-colors">
-                    {institution.advisors?.length > 0 ? `(${institution.advisors.length})` : ''}
+                    {advisorPreviewCount > 0 ? `(${advisorPreviewCount})` : ''}
                   </span>
                   <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary ml-auto transition-colors" />
                 </button>
@@ -265,7 +289,7 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
                         </button>
                         <div className="flex-1 min-w-0">
                           <p className={`text-sm truncate ${task.isCompleted ? 'line-through text-muted-foreground' : ''}`}>{task.title}</p>
-                          <p className="text-xs text-muted-foreground">截止 {format(new Date(task.dueDate), 'MM/dd', { locale: zhCN })}</p>
+                          <p className="text-xs text-muted-foreground">截止 {formatDateSafe(task.dueDate, 'MM/dd')}</p>
                         </div>
                       </div>
                     ))}
@@ -306,7 +330,7 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
                     </button>
                     <div className="flex-1">
                       <p className={task.isCompleted ? 'line-through text-muted-foreground' : ''}>{task.title}</p>
-                      <p className="text-xs text-muted-foreground">截止：{format(new Date(task.dueDate), 'yyyy/MM/dd', { locale: zhCN })}</p>
+                      <p className="text-xs text-muted-foreground">截止：{formatDateSafe(task.dueDate, 'yyyy/MM/dd')}</p>
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => { setSelectedTask(task); setShowTaskForm(true) }}><Edit2 className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => { if (confirm('确定删除此任务？')) deleteTask(task.id) }}><Trash2 className="h-4 w-4" /></Button>
@@ -341,6 +365,7 @@ interface AdvisorCardProps {
 
 function AdvisorCard({ advisor, onEdit, onAddInterview, updateAdvisor }: AdvisorCardProps): JSX.Element {
   const [showAssets, setShowAssets] = useState(false)
+  const starRating = renderStarRating(advisor.reputationScore)
 
   const handleOpenFile = async (path: string): Promise<void> => {
     try { await window.api.file.openExternal(path) } catch (error) { console.error('Failed to open file:', error) }
@@ -397,10 +422,10 @@ function AdvisorCard({ advisor, onEdit, onAddInterview, updateAdvisor }: Advisor
           <p><span className="text-muted-foreground">主页：</span><a href={advisor.homepage} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1"><ExternalLink className="h-3 w-3" />访问</a></p>
         )}
         {advisor.lastContactDate && (
-          <p><span className="text-muted-foreground">最后联系：</span>{format(new Date(advisor.lastContactDate), 'yyyy/MM/dd', { locale: zhCN })}</p>
+          <p><span className="text-muted-foreground">最后联系：</span>{formatDateSafe(advisor.lastContactDate, 'yyyy/MM/dd')}</p>
         )}
-        {advisor.reputationScore && (
-          <p><span className="text-muted-foreground">评分：</span>{'★'.repeat(advisor.reputationScore)}{'☆'.repeat(5 - advisor.reputationScore)}</p>
+        {starRating && (
+          <p><span className="text-muted-foreground">评分：</span>{starRating}</p>
         )}
       </div>
 
