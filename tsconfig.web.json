@@ -3,6 +3,8 @@
   "compilerOptions": {
     "ignoreDeprecations": "5.0",
     "composite": true,
+    "outDir": "./out/types-web",
+    "declaration": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]

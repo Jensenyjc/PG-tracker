@@ -28,6 +28,7 @@ export default function KanbanBoard({ onSelectInstitution }: KanbanBoardProps): 
   const { institutions } = useStore()
   const [showForm, setShowForm] = useState(false)
   const [editingInstitution, setEditingInstitution] = useState<Institution | null>(null)
+  const [activeTab, setActiveTab] = useState('all')
 
   const reachSchools = institutions.filter((i) => i.tier === 'REACH')
   const matchSchools = institutions.filter((i) => i.tier === 'MATCH')
@@ -52,7 +53,7 @@ export default function KanbanBoard({ onSelectInstitution }: KanbanBoardProps): 
       </header>
 
       <div className="flex-1 overflow-hidden">
-        <Tabs defaultValue="all" className="h-full flex flex-col">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
           <div className="px-4 pt-4">
             <TabsList>
               <TabsTrigger value="all">全部 ({institutions.length})</TabsTrigger>
@@ -86,7 +87,11 @@ export default function KanbanBoard({ onSelectInstitution }: KanbanBoardProps): 
         <InstitutionForm
           institution={editingInstitution}
           onClose={() => { setShowForm(false); setEditingInstitution(null) }}
-          onSuccess={() => { setShowForm(false); setEditingInstitution(null) }}
+          onSuccess={(savedInstitution) => {
+            setShowForm(false)
+            setEditingInstitution(null)
+            if (savedInstitution?.tier) setActiveTab(savedInstitution.tier.toLowerCase())
+          }}
         />
       )}
     </div>

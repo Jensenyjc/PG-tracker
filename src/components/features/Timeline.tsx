@@ -7,8 +7,7 @@
  * Copyright (c) 2026. All rights reserved.
  */
 import { useState, useEffect, useMemo } from 'react'
-import { format, isPast, isToday, isTomorrow, isThisWeek } from 'date-fns'
-import { zhCN } from 'date-fns/locale'
+import { isPast, isToday, isTomorrow, isThisWeek } from 'date-fns'
 import { Calendar, Clock, AlertCircle, CheckCircle2, Circle, ArrowRight, Plus, X, Edit2, Trash2 } from 'lucide-react'
 import { Institution, Task, useStore } from '../../stores/appStore'
 import { Button } from '../ui/button'
@@ -17,6 +16,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '.
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { ConfirmDialog } from '../ui/confirm-dialog'
+import { formatDateSafe, parseValidDate } from '../../lib/utils'
 
 interface TimelineProps {
   institutions: Institution[]
@@ -47,11 +47,13 @@ export default function Timeline({ institutions }: TimelineProps): JSX.Element {
   const [orphanTaskCompletion, setOrphanTaskCompletion] = useState<Record<string, boolean>>({})
 
   // 同步 store orphanTasks → 本地乐观状态
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const map: Record<string, boolean> = {}
     orphanTasks.forEach(t => { map[t.id] = t.isCompleted })
     setOrphanTaskCompletion(map)
   }, [orphanTasks])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => { loadOrphanTasks() }, [])
 
@@ -100,12 +102,13 @@ export default function Timeline({ institutions }: TimelineProps): JSX.Element {
   }, [timelineEvents])
 
   const getDateLabel = (date: string): { label: string; color: string } => {
-    const d = new Date(date)
+    const d = parseValidDate(date)
+    if (!d) return { label: '--', color: 'text-muted-foreground' }
     if (isPast(d) && !isToday(d)) return { label: '已过期', color: 'text-destructive' }
     if (isToday(d)) return { label: '今天', color: 'text-primary' }
     if (isTomorrow(d)) return { label: '明天', color: 'text-amber-600' }
     if (isThisWeek(d)) return { label: '本周', color: 'text-blue-600' }
-    return { label: format(d, 'MM/dd', { locale: zhCN }), color: 'text-muted-foreground' }
+    return { label: formatDateSafe(d, 'MM/dd'), color: 'text-muted-foreground' }
   }
 
   const handleAddSchedule = async (): Promise<void> => {
@@ -306,7 +309,7 @@ export default function Timeline({ institutions }: TimelineProps): JSX.Element {
 
                           {/* 日期 */}
                           <div className="flex-shrink-0 text-xs text-muted-foreground mr-1">
-                            {format(new Date(event.date), 'yyyy/MM/dd', { locale: zhCN })}
+                            {formatDateSafe(event.date, 'yyyy/MM/dd')}
                           </div>
 
                           {/* 独立任务行内操作 */}

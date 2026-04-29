@@ -16,6 +16,9 @@ interface ApiResponse<T = any> {
 }
 
 interface CustomAPI {
+  app: {
+    getVersion: () => Promise<string>
+  }
   institution: {
     getAll: () => Promise<any[]>
     getById: (id: string) => Promise<any>
@@ -62,6 +65,23 @@ interface CustomAPI {
     create: (data: any) => Promise<ApiResponse>
     delete: (id: string) => Promise<ApiResponse>
   }
+  backup: {
+    exportAll: () => Promise<ApiResponse<{ version: string; exportedAt: string; institutions: any[]; orphanTasks: any[]; emailTemplates: any[] }>>
+    importAll: (data: any) => Promise<ApiResponse<{ institutions: number; orphanTasks: number; emailTemplates: number }>>
+  }
+  updater: {
+    check: () => Promise<ApiResponse>
+    download: () => Promise<ApiResponse>
+    install: () => void
+    onStatus: (callback: (status: UpdateStatus) => void) => () => void
+  }
+}
+
+interface UpdateStatus {
+  phase: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
+  version?: string
+  percent?: number
+  error?: string
 }
 
 declare global {

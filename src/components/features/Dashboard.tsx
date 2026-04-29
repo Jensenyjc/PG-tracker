@@ -7,12 +7,12 @@
  * Copyright (c) 2026. All rights reserved.
  */
 import { useMemo, useEffect } from 'react'
-import { format, isPast, differenceInDays } from 'date-fns'
-import { zhCN } from 'date-fns/locale'
+import { isPast, differenceInDays } from 'date-fns'
 import { Calendar, TrendingUp, Users, CheckCircle2, Clock, ArrowRight, List } from 'lucide-react'
 import { useStore, Institution } from '../../stores/appStore'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
+import { formatDateSafe, parseValidDate } from '../../lib/utils'
 
 export default function Dashboard(): JSX.Element {
   const { institutions, orphanTasks, loadOrphanTasks, setView, setSelectedInstitutionId } = useStore()
@@ -35,11 +35,17 @@ export default function Dashboard(): JSX.Element {
   const allDeadlines = useMemo(() => {
     const items: { institution: Institution; deadline: string; type: '夏令营' | '预推免'; daysLeft: number }[] = []
     for (const inst of institutions) {
-      if (inst.campDeadline && !isPast(new Date(inst.campDeadline))) {
-        items.push({ institution: inst, deadline: inst.campDeadline, type: '夏令营', daysLeft: differenceInDays(new Date(inst.campDeadline), new Date()) })
+      if (inst.campDeadline) {
+        const campDate = parseValidDate(inst.campDeadline)
+        if (campDate && !isPast(campDate)) {
+          items.push({ institution: inst, deadline: inst.campDeadline, type: '夏令营', daysLeft: differenceInDays(campDate, new Date()) })
+        }
       }
-      if (inst.pushDeadline && !isPast(new Date(inst.pushDeadline))) {
-        items.push({ institution: inst, deadline: inst.pushDeadline, type: '预推免', daysLeft: differenceInDays(new Date(inst.pushDeadline), new Date()) })
+      if (inst.pushDeadline) {
+        const pushDate = parseValidDate(inst.pushDeadline)
+        if (pushDate && !isPast(pushDate)) {
+          items.push({ institution: inst, deadline: inst.pushDeadline, type: '预推免', daysLeft: differenceInDays(pushDate, new Date()) })
+        }
       }
     }
     return items.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
@@ -108,7 +114,7 @@ export default function Dashboard(): JSX.Element {
                           <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                             <UrgencyBadge urgency={urgency} />
                             <BadgeTier tier={institution.tier} type={type} />
-                            <span className="text-xs text-muted-foreground">{format(new Date(deadline), 'MM/dd', { locale: zhCN })}</span>
+                            <span className="text-xs text-muted-foreground">{formatDateSafe(deadline, 'MM/dd')}</span>
                           </div>
                         </div>
                       )
@@ -140,7 +146,7 @@ export default function Dashboard(): JSX.Element {
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                             <UrgencyBadge urgency={urgency} />
-                            <span className="text-xs text-muted-foreground">{format(new Date(task.dueDate), 'MM/dd', { locale: zhCN })}</span>
+                            <span className="text-xs text-muted-foreground">{formatDateSafe(task.dueDate, 'MM/dd')}</span>
                           </div>
                         </div>
                       )

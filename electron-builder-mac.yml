@@ -1,6 +1,11 @@
 appId: com.pg-tracker.app
 productName: PG-Tracker
 
+publish:
+  provider: github
+  owner: Jensenyjc
+  repo: pg-tracker-v2
+
 directories:
   buildResources: build
   output: dist-mac

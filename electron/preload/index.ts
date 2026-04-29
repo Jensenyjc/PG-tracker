@@ -14,6 +14,9 @@ const electronAPI = {
 }
 
 const api = {
+  app: {
+    getVersion: () => ipcRenderer.invoke('app:getVersion')
+  },
   institution: {
     getAll: () => ipcRenderer.invoke('institution:getAll'),
     getById: (id: string) => ipcRenderer.invoke('institution:getById', id),
@@ -59,6 +62,20 @@ const api = {
     getByTemplate: (templateId: string) => ipcRenderer.invoke('emailVariable:getByTemplate', templateId),
     create: (data: any) => ipcRenderer.invoke('emailVariable:create', data),
     delete: (id: string) => ipcRenderer.invoke('emailVariable:delete', id)
+  },
+  backup: {
+    exportAll: () => ipcRenderer.invoke('backup:exportAll'),
+    importAll: (data: any) => ipcRenderer.invoke('backup:importAll', data)
+  },
+  updater: {
+    check: () => ipcRenderer.invoke('update:check'),
+    download: () => ipcRenderer.invoke('update:download'),
+    install: () => ipcRenderer.invoke('update:install'),
+    onStatus: (callback: (status: any) => void) => {
+      const listener = (_event: any, status: any) => callback(status)
+      ipcRenderer.on('update:status', listener)
+      return () => { ipcRenderer.removeListener('update:status', listener) }
+    }
   }
 }
 
@@ -70,8 +87,8 @@ if (process.contextIsolated) {
     console.error(error)
   }
 } else {
-  // @ts-ignore
+  // @ts-expect-error - window.electron may not exist in type definitions
   window.electron = electronAPI
-  // @ts-ignore
+  // @ts-expect-error - window.api may not exist in type definitions
   window.api = api
 }

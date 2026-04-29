@@ -18,6 +18,7 @@ import Timeline from './components/features/Timeline'
 import EmailTemplates from './components/features/EmailTemplates'
 import Settings from './components/features/Settings'
 import Dashboard from './components/features/Dashboard'
+import UpdateNotification from './components/features/UpdateNotification'
 
 function App(): JSX.Element {
   const { currentView, selectedInstitutionId, setView, setSelectedInstitutionId, loadInstitutions, institutions, isLoading } = useStore()
@@ -82,8 +83,11 @@ function App(): JSX.Element {
             onViewChange={setView}
             onSelectInstitution={handleSelectInstitution}
           />
-          <main className="flex-1 overflow-hidden">
-            {renderContent()}
+          <main className="flex-1 overflow-hidden flex flex-col">
+            <UpdateNotification />
+            <div className="flex-1 overflow-hidden">
+              {renderContent()}
+            </div>
           </main>
         </div>
       </ColorThemeProvider>

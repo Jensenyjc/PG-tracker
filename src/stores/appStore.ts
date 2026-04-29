@@ -121,7 +121,7 @@ interface AppState {
   loadInstitutions: () => Promise<void>
   loadOrphanTasks: () => Promise<void>
   addInstitution: (data: InstitutionInput) => Promise<Institution>
-  updateInstitution: (id: string, data: Partial<InstitutionInput>) => Promise<void>
+  updateInstitution: (id: string, data: Partial<InstitutionInput>) => Promise<Institution>
   deleteInstitution: (id: string) => Promise<void>
   addAdvisor: (data: AdvisorInput) => Promise<Advisor>
   updateAdvisor: (id: string, data: Partial<AdvisorInput>) => Promise<void>
@@ -180,11 +180,9 @@ export const useStore = create<AppState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const newInstitution = await window.api.institution.create(data)
-      set((state) => ({
-        institutions: [newInstitution, ...state.institutions],
-        isLoading: false
-      }))
-      return newInstitution
+      const institutions = await window.api.institution.getAll()
+      set({ institutions, isLoading: false })
+      return institutions.find((i) => i.id === newInstitution.id) || newInstitution
     } catch (error: any) {
       set({ error: error.message, isLoading: false })
       throw error
@@ -195,10 +193,9 @@ export const useStore = create<AppState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const updated = await window.api.institution.update(id, data)
-      set((state) => ({
-        institutions: state.institutions.map((i) => (i.id === id ? updated : i)),
-        isLoading: false
-      }))
+      const institutions = await window.api.institution.getAll()
+      set({ institutions, isLoading: false })
+      return institutions.find((i) => i.id === id) || updated
     } catch (error: any) {
       set({ error: error.message, isLoading: false })
       throw error
@@ -290,7 +287,9 @@ export const useStore = create<AppState>((set, get) => ({
 
   addAsset: async (data) => {
     try {
-      return await window.api.asset.create(data)
+      const asset = await window.api.asset.create(data)
+      await get().loadInstitutions()
+      return asset
     } catch (error: any) {
       set({ error: error.message })
       throw error
@@ -309,7 +308,9 @@ export const useStore = create<AppState>((set, get) => ({
 
   addInterview: async (data) => {
     try {
-      return await window.api.interview.create(data)
+      const interview = await window.api.interview.create(data)
+      await get().loadInstitutions()
+      return interview
     } catch (error: any) {
       set({ error: error.message })
       throw error

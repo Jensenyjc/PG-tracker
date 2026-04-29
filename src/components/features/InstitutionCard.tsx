@@ -6,14 +6,13 @@
  * @Date: 2026-04-08
  * Copyright (c) 2026. All rights reserved.
  */
-import { format, isPast, differenceInDays } from 'date-fns'
-import { zhCN } from 'date-fns/locale'
+import { isPast, differenceInDays } from 'date-fns'
 import { Calendar, AlertCircle, Edit2, Mail, Users } from 'lucide-react'
 import { Institution } from '../../stores/appStore'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { tierColors, tierLabels, degreeTypeLabels } from '../../lib/constants'
-import { parsePolicyTags } from '../../lib/utils'
+import { parsePolicyTags, parseValidDate, formatDateSafe } from '../../lib/utils'
 
 interface InstitutionCardProps {
   institution: Institution
@@ -23,11 +22,12 @@ interface InstitutionCardProps {
 
 export default function InstitutionCard({ institution, onClick, onEdit }: InstitutionCardProps): JSX.Element {
   const deadline = institution.campDeadline || institution.pushDeadline
-  const isOverdue = deadline ? isPast(new Date(deadline)) : false
-  const daysLeft = deadline ? differenceInDays(new Date(deadline), new Date()) : null
+  const deadlineDate = parseValidDate(deadline)
+  const isOverdue = deadlineDate ? isPast(deadlineDate) : false
+  const daysLeft = deadlineDate ? differenceInDays(deadlineDate, new Date()) : null
 
   const getDeadlineStatus = (): { color: string; label: string } => {
-    if (!deadline) return { color: 'text-muted-foreground', label: '无截止日期' }
+    if (!deadlineDate) return { color: 'text-muted-foreground', label: '无截止日期' }
     if (isOverdue) return { color: 'text-destructive', label: '已过期' }
     if (daysLeft !== null && daysLeft <= 7) return { color: 'text-destructive', label: `${daysLeft}天后截止` }
     if (daysLeft !== null && daysLeft <= 14) return { color: 'text-amber-600', label: `${daysLeft}天后截止` }
@@ -80,10 +80,10 @@ export default function InstitutionCard({ institution, onClick, onEdit }: Instit
         </div>
       )}
 
-      {deadline && (
+      {deadlineDate && (
         <div className={`flex items-center gap-1.5 text-xs ${deadlineStatus.color}`}>
           <Calendar className="h-3.5 w-3.5" />
-          <span>{format(new Date(deadline), 'yyyy/MM/dd', { locale: zhCN })}</span>
+          <span>{formatDateSafe(deadline, 'yyyy/MM/dd')}</span>
           {daysLeft !== null && daysLeft <= 7 && !isOverdue && <AlertCircle className="h-3.5 w-3.5" />}
         </div>
       )}

@@ -20,7 +20,7 @@ import { parsePolicyTags } from '../../lib/utils'
 interface InstitutionFormProps {
   institution?: Institution | null
   onClose: () => void
-  onSuccess: () => void
+  onSuccess: (savedInstitution?: Institution) => void
 }
 
 export default function InstitutionForm({ institution, onClose, onSuccess }: InstitutionFormProps): JSX.Element {
@@ -34,7 +34,7 @@ export default function InstitutionForm({ institution, onClose, onSuccess }: Ins
         degreeType: institution.degreeType,
         campDeadline: institution.campDeadline || '',
         pushDeadline: institution.pushDeadline || '',
-        expectedQuota: institution.expectedQuota || undefined,
+        expectedQuota: institution.expectedQuota != null ? institution.expectedQuota : undefined,
         policyTags: parsePolicyTags(institution.policyTags)
       }
     }
@@ -54,6 +54,7 @@ export default function InstitutionForm({ institution, onClose, onSuccess }: Ins
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   // 用户修改表单时清除之前的错误提示
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setSubmitError(null) }, [formData.name, formData.department])
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
@@ -68,15 +69,13 @@ export default function InstitutionForm({ institution, onClose, onSuccess }: Ins
         degreeType: formData.degreeType,
         campDeadline: formData.campDeadline || null,
         pushDeadline: formData.pushDeadline || null,
-        expectedQuota: formData.expectedQuota || null,
+        expectedQuota: formData.expectedQuota != null ? formData.expectedQuota : null,
         policyTags: formData.policyTags
       }
-      if (institution) {
-        await updateInstitution(institution.id, data)
-      } else {
-        await addInstitution(data)
-      }
-      onSuccess()
+      const savedInstitution = institution
+        ? await updateInstitution(institution.id, data)
+        : await addInstitution(data)
+      onSuccess(savedInstitution)
     } catch (error: any) {
       const msg = error?.message || '保存失败，请重试'
       setSubmitError(msg)
@@ -160,7 +159,7 @@ export default function InstitutionForm({ institution, onClose, onSuccess }: Ins
 
           <div>
             <Label htmlFor="inst-quota">预计招生名额</Label>
-            <Input id="inst-quota" type="number" min="0" value={formData.expectedQuota || ''} onChange={(e) => setFormData(prev => ({ ...prev, expectedQuota: e.target.value ? parseInt(e.target.value) : undefined }))} placeholder="如：10" />
+            <Input id="inst-quota" type="number" min="0" value={formData.expectedQuota ?? ''} onChange={(e) => setFormData(prev => ({ ...prev, expectedQuota: e.target.value !== '' ? parseInt(e.target.value) : undefined }))} placeholder="如：10" />
           </div>
 
           <div>

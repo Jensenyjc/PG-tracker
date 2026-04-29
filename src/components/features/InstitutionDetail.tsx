@@ -7,8 +7,6 @@
  * Copyright (c) 2026. All rights reserved.
  */
 import { useState, useEffect } from 'react'
-import { format } from 'date-fns'
-import { zhCN } from 'date-fns/locale'
 import { ArrowLeft, Building2, Users, Edit2, Trash2, Plus, Mail, ExternalLink, FileText, CheckCircle2, Circle, AlertTriangle, ArrowRight, ChevronDown, Check } from 'lucide-react'
 import { useStore, Advisor, Task } from '../../stores/appStore'
 import { Button } from '../ui/button'
@@ -17,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../ui/dropdown-menu'
 import { ConfirmDialog } from '../ui/confirm-dialog'
 import { tierColors, tierLabels, degreeTypeLabels, advisorStatusConfig } from '../../lib/constants'
-import { parsePolicyTags } from '../../lib/utils'
+import { parsePolicyTags, formatDateSafe } from '../../lib/utils'
 import AdvisorForm from './AdvisorForm'
 import TaskForm from './TaskForm'
 import InterviewForm from './InterviewForm'
@@ -28,20 +26,6 @@ interface InstitutionDetailProps {
   onBack: () => void
 }
 
-type DateLike = string | Date | null | undefined
-
-function parseValidDate(value: DateLike): Date | null {
-  if (!value) return null
-
-  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date
-}
-
-function formatDateSafe(value: DateLike, pattern: string, fallback = '--'): string {
-  const date = parseValidDate(value)
-  return date ? format(date, pattern, { locale: zhCN }) : fallback
-}
-
 function renderStarRating(score: number | null | undefined): string | null {
   if (typeof score !== 'number' || !Number.isFinite(score)) return null
 
@@ -50,7 +34,7 @@ function renderStarRating(score: number | null | undefined): string | null {
 }
 
 export default function InstitutionDetail({ institutionId, onBack }: InstitutionDetailProps): JSX.Element {
-  const { institutions, deleteInstitution, updateTask, deleteTask, updateAdvisor, conflictWarnings, checkConflicts } = useStore()
+  const { institutions, isLoading, deleteInstitution, updateTask, deleteTask, updateAdvisor, conflictWarnings, checkConflicts } = useStore()
   const [showAdvisorForm, setShowAdvisorForm] = useState(false)
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [showInterviewForm, setShowInterviewForm] = useState(false)
@@ -69,9 +53,17 @@ export default function InstitutionDetail({ institutionId, onBack }: Institution
   }, [institutionId, checkConflicts])
 
   if (!institution) {
+    if (isLoading) {
+      return (
+        <div className="h-full flex items-center justify-center">
+          <p className="text-muted-foreground">院校信息加载中...</p>
+        </div>
+      )
+    }
     return (
-      <div className="h-full flex items-center justify-center">
-        <p className="text-muted-foreground">院校信息加载中...</p>
+      <div className="h-full flex items-center justify-center flex-col gap-4">
+        <p className="text-muted-foreground">院校信息不存在，可能已被删除</p>
+        <Button variant="outline" onClick={onBack}>返回院校列表</Button>
       </div>
     )
   }

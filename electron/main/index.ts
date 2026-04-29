@@ -8,12 +8,10 @@
  */
 import { app, shell, BrowserWindow, ipcMain, dialog, type OpenDialogOptions } from 'electron'
 import { join, dirname } from 'path'
-import { existsSync, copyFileSync, unlinkSync, mkdirSync, writeFileSync } from 'fs'
+import { existsSync, copyFileSync, mkdirSync, writeFileSync } from 'fs'
 import log from 'electron-log'
-import { exec } from 'child_process'
-import { promisify } from 'util'
-
-const execAsync = promisify(exec)
+import { spawn } from 'child_process'
+import { initUpdater, autoUpdater } from './updater'
 
 // ==================== 全局崩溃日志捕捉 ====================
 // 必须在最早期注册，确保任何未捕获的异常都能记录
@@ -82,10 +80,82 @@ function getPrismaClientPath(): string {
   return extraPrismaPath
 }
 
+function backupUserDatabase(userDbPath: string, reason: string): void {
+  const backupDir = join(dirname(userDbPath), 'backups')
+  mkdirSync(backupDir, { recursive: true })
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const backupBasePath = join(backupDir, `dev-${timestamp}`)
+
+  for (const suffix of ['', '-wal', '-shm']) {
+    const source = `${userDbPath}${suffix}`
+    if (existsSync(source)) {
+      copyFileSync(source, `${backupBasePath}.db${suffix}`)
+    }
+  }
+
+  log.info(`[Prod] Backed up user database before ${reason}:`, backupBasePath)
+}
+
+async function ensureProductionDatabaseSchema(userDbPath: string): Promise<void> {
+  let tmpPrisma: any = null
+  try {
+    const { PrismaClient: PC } = require(getPrismaClientPath())
+    tmpPrisma = new PC({ datasources: { db: { url: `file:${userDbPath}` } } })
+
+    const rows = await tmpPrisma.$queryRawUnsafe(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('EmailTemplate', 'EmailVariable')"
+    )
+    const existingTables = new Set((rows as Array<{ name: string }>).map((row) => row.name))
+    const needsEmailTables = !existingTables.has('EmailTemplate') || !existingTables.has('EmailVariable')
+
+    if (!needsEmailTables) {
+      log.info('[Prod] User database schema is up to date')
+      return
+    }
+
+    backupUserDatabase(userDbPath, 'schema migration')
+    log.warn('[Prod] User database schema is missing email tables. Applying non-destructive migration.')
+
+    await tmpPrisma.$executeRawUnsafe('BEGIN IMMEDIATE')
+    try {
+      await tmpPrisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "EmailTemplate" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "name" TEXT NOT NULL,
+          "subject" TEXT NOT NULL,
+          "content" TEXT NOT NULL,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL
+        )
+      `)
+      await tmpPrisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "EmailVariable" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "name" TEXT NOT NULL,
+          "templateId" TEXT NOT NULL,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "EmailVariable_templateId_fkey"
+            FOREIGN KEY ("templateId") REFERENCES "EmailTemplate" ("id")
+            ON DELETE CASCADE ON UPDATE CASCADE
+        )
+      `)
+      await tmpPrisma.$executeRawUnsafe('COMMIT')
+      log.info('[Prod] Database schema migration completed without replacing user data')
+    } catch (migrationError) {
+      try { await tmpPrisma.$executeRawUnsafe('ROLLBACK') } catch {}
+      throw migrationError
+    }
+  } finally {
+    if (tmpPrisma) {
+      try { await tmpPrisma.$disconnect() } catch {}
+    }
+  }
+}
+
 /**
  * 数据库初始化主函数。
- * 每次启动时检测用户数据库的 schema 版本，如果缺少 EmailTemplate 表，
- * 说明是旧版本安装后覆盖安装的场景，强制用安装包里的最新数据库替换。
+ * 每次启动时检测用户数据库的 schema 版本，如果缺少 EmailTemplate 相关表，
+ * 先备份用户数据库，再执行非破坏性迁移补齐缺失表，不覆盖真实用户数据。
  * 不再调用 getPrisma()（避免循环依赖），直接用临时 PrismaClient 按路径检测。
  */
 async function initializeDatabase(): Promise<string> {
@@ -116,34 +186,13 @@ async function initializeDatabase(): Promise<string> {
         'PG-Tracker 启动失败',
         `找不到初始数据库文件。\n预期路径: ${resourceDbPath}\n\n请尝试重新安装软件。`
       )
+      throw new Error(`Seed database not found at ${resourceDbPath}`)
     }
     return userDbPath
   }
 
-  // 覆盖安装场景：检测 EmailTemplate 表是否存在于用户数据库
-  let tmpPrisma: any = null
-  try {
-    const { PrismaClient: PC } = require(getPrismaClientPath())
-    tmpPrisma = new PC({ datasources: { db: { url: `file:${userDbPath}` } } })
-    await tmpPrisma.emailTemplate.findFirst({ select: { id: true } })
-    log.info('[Prod] User database schema is up to date')
-    return userDbPath
-  } catch (err: any) {
-    log.warn('[Prod] User database schema is outdated. Replacing with fresh database from resources.', err?.message)
-    try { unlinkSync(userDbPath) } catch {}
-    try { unlinkSync(userDbPath + '-shm') } catch {}
-    try { unlinkSync(userDbPath + '-wal') } catch {}
-    if (existsSync(resourceDbPath)) {
-      copyFileSync(resourceDbPath, userDbPath)
-      log.info('[Prod] Database replaced successfully')
-    }
-    return userDbPath
-  } finally {
-    // 确保临时连接被关闭
-    if (tmpPrisma) {
-      try { await tmpPrisma.$disconnect() } catch {}
-    }
-  }
+  await ensureProductionDatabaseSchema(userDbPath)
+  return userDbPath
 }
 
 async function getPrisma(): Promise<any> {
@@ -233,8 +282,64 @@ async function getPrisma(): Promise<any> {
   return prismaInitPromise
 }
 
+function parseNullableDate(value: any, fieldName: string): Date | null {
+  if (value === null || value === '' || value === undefined) return null
+  const parsed = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`${fieldName} 格式不正确`)
+  }
+  return parsed
+}
+
+function parseDateRequired(value: any, fieldName: string): Date {
+  if (value === null || value === undefined || value === '') {
+    throw new Error(`${fieldName} 是必填项`)
+  }
+  const parsed = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`${fieldName} 格式不正确`)
+  }
+  return parsed
+}
+
+function buildInstitutionUpdateData(data: any): Record<string, any> {
+  const updateData: Record<string, any> = {}
+
+  if (data.name !== undefined) updateData.name = data.name
+  if (data.department !== undefined) updateData.department = data.department
+  if (data.tier !== undefined) updateData.tier = data.tier
+  if (data.degreeType !== undefined) updateData.degreeType = data.degreeType
+  if (data.campDeadline !== undefined) updateData.campDeadline = parseNullableDate(data.campDeadline, 'campDeadline')
+  if (data.pushDeadline !== undefined) updateData.pushDeadline = parseNullableDate(data.pushDeadline, 'pushDeadline')
+  if (data.expectedQuota !== undefined) updateData.expectedQuota = data.expectedQuota
+  if (data.policyTags !== undefined) {
+    updateData.policyTags = JSON.stringify(Array.isArray(data.policyTags) ? data.policyTags : [])
+  }
+
+  return updateData
+}
+
+function buildAdvisorUpdateData(data: any): Record<string, any> {
+  const updateData: Record<string, any> = {}
+
+  if (data.institutionId !== undefined) updateData.institutionId = data.institutionId
+  if (data.name !== undefined) updateData.name = data.name
+  if (data.title !== undefined) updateData.title = data.title
+  if (data.researchArea !== undefined) updateData.researchArea = data.researchArea
+  if (data.email !== undefined) updateData.email = data.email
+  if (data.homepage !== undefined) updateData.homepage = data.homepage
+  if (data.contactStatus !== undefined) updateData.contactStatus = data.contactStatus
+  if (data.lastContactDate !== undefined) updateData.lastContactDate = parseNullableDate(data.lastContactDate, 'lastContactDate')
+  if (data.reputationScore !== undefined) updateData.reputationScore = data.reputationScore
+  if (data.notes !== undefined) updateData.notes = data.notes
+
+  return updateData
+}
+
 log.transports.file.level = 'info'
 log.info('Application starting...', { isDev, platform })
+
+ipcMain.handle('app:getVersion', () => app.getVersion())
 
 // ==================== 主窗口创建 ====================
 let mainWindow: BrowserWindow | null = null
@@ -260,7 +365,14 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    try {
+      const parsed = new URL(details.url)
+      if (['http:', 'https:', 'mailto:'].includes(parsed.protocol)) {
+        shell.openExternal(details.url)
+      }
+    } catch {
+      // 非法的 URL 格式，忽略
+    }
     return { action: 'deny' }
   })
 
@@ -279,7 +391,10 @@ ipcMain.handle('institution:getAll', async () => {
   try {
     const client = await getPrisma()
     return await client.institution.findMany({
-      include: { advisors: true, tasks: true },
+      include: {
+        advisors: { include: { assets: true, interviews: true } },
+        tasks: true
+      },
       orderBy: { createdAt: 'desc' }
     })
   } catch (error) {
@@ -313,8 +428,8 @@ ipcMain.handle('institution:create', async (_, data: any) => {
         department: data.department,
         tier: data.tier,
         degreeType: data.degreeType,
-        campDeadline: data.campDeadline ? new Date(data.campDeadline) : null,
-        pushDeadline: data.pushDeadline ? new Date(data.pushDeadline) : null,
+        campDeadline: parseNullableDate(data.campDeadline, 'campDeadline'),
+        pushDeadline: parseNullableDate(data.pushDeadline, 'pushDeadline'),
         expectedQuota: data.expectedQuota,
         policyTags: JSON.stringify(data.policyTags || [])
       },
@@ -329,18 +444,16 @@ ipcMain.handle('institution:create', async (_, data: any) => {
 ipcMain.handle('institution:update', async (_, id: string, data: any) => {
   try {
     const client = await getPrisma()
+    const updateData = buildInstitutionUpdateData(data)
+    if (Object.keys(updateData).length === 0) {
+      return await client.institution.findUnique({
+        where: { id },
+        include: { advisors: true, tasks: true }
+      })
+    }
     return await client.institution.update({
       where: { id },
-      data: {
-        name: data.name,
-        department: data.department,
-        tier: data.tier,
-        degreeType: data.degreeType,
-        campDeadline: data.campDeadline ? new Date(data.campDeadline) : null,
-        pushDeadline: data.pushDeadline ? new Date(data.pushDeadline) : null,
-        expectedQuota: data.expectedQuota,
-        policyTags: JSON.stringify(data.policyTags || [])
-      },
+      data: updateData,
       include: { advisors: true, tasks: true }
     })
   } catch (error) {
@@ -387,6 +500,7 @@ ipcMain.handle('advisor:create', async (_, data: any) => {
         email: data.email,
         homepage: data.homepage,
         contactStatus: data.contactStatus || 'PENDING',
+        lastContactDate: parseNullableDate(data.lastContactDate, 'lastContactDate'),
         reputationScore: data.reputationScore,
         notes: data.notes
       },
@@ -401,19 +515,16 @@ ipcMain.handle('advisor:create', async (_, data: any) => {
 ipcMain.handle('advisor:update', async (_, id: string, data: any) => {
   try {
     const client = await getPrisma()
+    const updateData = buildAdvisorUpdateData(data)
+    if (Object.keys(updateData).length === 0) {
+      return await client.advisor.findUnique({
+        where: { id },
+        include: { assets: true, interviews: true }
+      })
+    }
     return await client.advisor.update({
       where: { id },
-      data: {
-        name: data.name,
-        title: data.title,
-        researchArea: data.researchArea,
-        email: data.email,
-        homepage: data.homepage,
-        contactStatus: data.contactStatus,
-        lastContactDate: data.lastContactDate ? new Date(data.lastContactDate) : null,
-        reputationScore: data.reputationScore,
-        notes: data.notes
-      },
+      data: updateData,
       include: { assets: true, interviews: true }
     })
   } catch (error) {
@@ -468,7 +579,7 @@ ipcMain.handle('task:create', async (_, data: any) => {
       data: {
         institutionId: data.institutionId || null,
         title: data.title,
-        dueDate: new Date(data.dueDate),
+        dueDate: parseDateRequired(data.dueDate, 'dueDate'),
         isCompleted: false
       }
     })
@@ -489,16 +600,12 @@ ipcMain.handle('task:update', async (_, id: string, data: any) => {
       updateData.title = data.title
     }
 
-    if (data.dueDate !== undefined) {
-      if (data.dueDate === null || data.dueDate === '') {
-        updateData.dueDate = null
-      } else {
-        const parsedDate = new Date(data.dueDate)
-        if (isNaN(parsedDate.getTime())) {
-          return { success: false, data: null, error: '传递的 dueDate 格式不正确' }
-        }
-        updateData.dueDate = parsedDate
+    if (data.dueDate !== undefined && data.dueDate !== null && data.dueDate !== '') {
+      const parsedDate = new Date(data.dueDate)
+      if (isNaN(parsedDate.getTime())) {
+        return { success: false, data: null, error: '传递的 dueDate 格式不正确' }
       }
+      updateData.dueDate = parsedDate
     }
 
     if (data.isCompleted !== undefined) {
@@ -561,7 +668,7 @@ ipcMain.handle('interview:create', async (_, data: any) => {
     return await client.interview.create({
       data: {
         advisorId: data.advisorId,
-        date: new Date(data.date),
+        date: parseDateRequired(data.date, 'date'),
         format: data.format,
         markdownNotes: data.markdownNotes || ''
       }
@@ -575,13 +682,25 @@ ipcMain.handle('interview:create', async (_, data: any) => {
 ipcMain.handle('interview:update', async (_, id: string, data: any) => {
   try {
     const client = await getPrisma()
+    const updateData: Record<string, any> = {}
+
+    if (data.date !== undefined) {
+      const parsed = new Date(data.date)
+      if (isNaN(parsed.getTime())) {
+        throw new Error('date 格式不正确')
+      }
+      updateData.date = parsed
+    }
+    if (data.format !== undefined) updateData.format = data.format
+    if (data.markdownNotes !== undefined) updateData.markdownNotes = data.markdownNotes
+
+    if (Object.keys(updateData).length === 0) {
+      return await client.interview.findUnique({ where: { id } })
+    }
+
     return await client.interview.update({
       where: { id },
-      data: {
-        date: new Date(data.date),
-        format: data.format,
-        markdownNotes: data.markdownNotes
-      }
+      data: updateData
     })
   } catch (error) {
     log.error('Error updating interview:', error)
@@ -635,12 +754,27 @@ ipcMain.handle('file:openExternal', async (_, path: string) => {
 
 ipcMain.handle('file:compileLatex', async (_, texPath: string) => {
   try {
-    const dir = texPath.substring(0, texPath.lastIndexOf('/') || texPath.lastIndexOf('\\'))
-    const command = platform === 'win32'
-      ? `cd /d "${dir}" && xelatex -interaction=nonstopmode "${texPath}"`
-      : `cd "${dir}" && xelatex -interaction=nonstopmode "${texPath}"`
-    const { stdout, stderr } = await execAsync(command)
-    return { success: true, stdout, stderr }
+    const dir = dirname(texPath)
+    const exe = platform === 'win32' ? 'xelatex.exe' : 'xelatex'
+    const args = ['-interaction=nonstopmode', texPath]
+
+    return new Promise<{ success: boolean; stdout?: string; stderr?: string; error?: string }>((resolve) => {
+      const proc = spawn(exe, args, { cwd: dir })
+      let stdout = ''
+      let stderr = ''
+      proc.stdout?.on('data', (data) => { stdout += data.toString() })
+      proc.stderr?.on('data', (data) => { stderr += data.toString() })
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve({ success: true, stdout, stderr })
+        } else {
+          resolve({ success: false, error: `xelatex exited with code ${code}`, stdout, stderr })
+        }
+      })
+      proc.on('error', (err) => {
+        resolve({ success: false, error: err.message })
+      })
+    })
   } catch (error: any) {
     log.error('Error compiling LaTeX:', error)
     return { success: false, error: error.message }
@@ -754,6 +888,105 @@ ipcMain.handle('emailVariable:delete', async (_, id: string) => {
   }
 })
 
+// ============== Full Backup Export / Import ==============
+
+ipcMain.handle('backup:exportAll', async () => {
+  try {
+    const client = await getPrisma()
+    const [institutions, orphanTasks, emailTemplates] = await Promise.all([
+      client.institution.findMany({
+        include: {
+          advisors: { include: { assets: true, interviews: true } },
+          tasks: true
+        }
+      }),
+      client.task.findMany({ where: { institutionId: null } }),
+      client.emailTemplate.findMany({ include: { variables: true } })
+    ])
+    return {
+      success: true,
+      data: {
+        version: app.getVersion(),
+        exportedAt: new Date().toISOString(),
+        institutions,
+        orphanTasks,
+        emailTemplates
+      }
+    }
+  } catch (error: any) {
+    log.error('Error exporting backup:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('backup:importAll', async (_, data: any) => {
+  try {
+    const client = await getPrisma()
+
+    const counts = { institutions: 0, orphanTasks: 0, emailTemplates: 0 }
+
+    await client.$transaction(async (tx: any) => {
+      // 1. 导入邮件模板及变量（无外键依赖，先导入）
+      if (Array.isArray(data.emailTemplates)) {
+        for (const tpl of data.emailTemplates) {
+          const { id, variables, ...tplRest } = tpl
+          await tx.emailTemplate.create({ data: { id, ...tplRest } })
+          if (Array.isArray(variables)) {
+            for (const v of variables) {
+              const { templateId, ...vRest } = v
+              await tx.emailVariable.create({ data: { ...vRest, templateId: id } })
+            }
+          }
+          counts.emailTemplates++
+        }
+      }
+
+      // 2. 导入院校及其关联的导师、资产、面经、任务
+      if (Array.isArray(data.institutions)) {
+        for (const inst of data.institutions) {
+          const { advisors, tasks, ...instRest } = inst
+          await tx.institution.create({ data: instRest })
+          if (Array.isArray(advisors)) {
+            for (const advisor of advisors) {
+              const { assets, interviews, ...advisorRest } = advisor
+              const created = await tx.advisor.create({ data: advisorRest })
+              if (Array.isArray(assets)) {
+                for (const asset of assets) {
+                  await tx.asset.create({ data: { ...asset, advisorId: created.id } })
+                }
+              }
+              if (Array.isArray(interviews)) {
+                for (const interview of interviews) {
+                  await tx.interview.create({ data: { ...interview, advisorId: created.id } })
+                }
+              }
+            }
+          }
+          if (Array.isArray(tasks)) {
+            for (const task of tasks) {
+              await tx.task.create({ data: { ...task, institutionId: inst.id } })
+            }
+          }
+          counts.institutions++
+        }
+      }
+
+      // 3. 导入独立任务
+      if (Array.isArray(data.orphanTasks)) {
+        for (const task of data.orphanTasks) {
+          await tx.task.create({ data: { ...task, institutionId: null } })
+          counts.orphanTasks++
+        }
+      }
+    })
+
+    return { success: true, data: counts }
+  } catch (error: any) {
+    log.error('Error importing backup:', error)
+    return { success: false, error: error.message }
+  }
+})
+
 // ============== Conflict Detection ==============
 
 ipcMain.handle('advisor:getConflictWarnings', async (_, institutionId: string) => {
@@ -821,9 +1054,42 @@ app.whenReady().then(async () => {
 
   createWindow()
 
+  // 生产环境下初始化自动更新
+  if (!isDev) {
+    initUpdater(mainWindow!)
+  }
+
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+// ============== Auto Update IPC ==============
+
+ipcMain.handle('update:check', async () => {
+  try {
+    const result = await autoUpdater.checkForUpdates()
+    return { success: true, data: result }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('update:download', async () => {
+  try {
+    await autoUpdater.downloadUpdate()
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('update:install', async () => {
+  if (prisma) {
+    await prisma.$disconnect()
+    prisma = null
+  }
+  autoUpdater.quitAndInstall()
 })
 
 app.on('window-all-closed', async () => {

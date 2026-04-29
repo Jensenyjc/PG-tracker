@@ -79,6 +79,15 @@ function extractVariables(text: string): string[] {
 }
 
 // 邮件预览渲染：已填变量值显示为绿色，未填显示为蓝色
+function htmlEscape(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
 function renderPreviewText(text: string, fillValues: Record<string, string>): string {
   const escaped = text
     .replace(/&/g, '&amp;')
@@ -89,9 +98,9 @@ function renderPreviewText(text: string, fillValues: Record<string, string>): st
       const key = varName.trim()
       const filled = fillValues[key]
       if (filled) {
-        return `<span class="inline-flex items-center bg-green-100 text-green-800 border border-green-200 px-1.5 py-0.5 rounded text-xs font-medium mx-0.5">${filled}</span>`
+        return `<span class="inline-flex items-center bg-green-100 text-green-800 border border-green-200 px-1.5 py-0.5 rounded text-xs font-medium mx-0.5">${htmlEscape(filled)}</span>`
       }
-      return `<span class="inline-flex items-center bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded text-xs font-mono mx-0.5">${key}</span>`
+      return `<span class="inline-flex items-center bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded text-xs font-mono mx-0.5">${htmlEscape(key)}</span>`
     })
     .replace(/\n/g, '<br />')
 }
@@ -99,7 +108,7 @@ function renderPreviewText(text: string, fillValues: Record<string, string>): st
 const STORAGE_KEY = 'pgTrackerEmailFillValues'
 
 export default function EmailTemplates(): JSX.Element {
-  const { emailTemplates, loadEmailTemplates, createEmailTemplate, updateEmailTemplate, deleteEmailTemplate, error, clearError } = useStore()
+  const { emailTemplates, loadEmailTemplates, createEmailTemplate, updateEmailTemplate, deleteEmailTemplate, error } = useStore()
 
   const [selectedTemplate, setSelectedTemplate] = useState<any | null>(null)
   const [editedName, setEditedName] = useState('')
@@ -179,7 +188,9 @@ export default function EmailTemplates(): JSX.Element {
       if (latest) setSelectedTemplate(latest)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
-    } catch { clearError() }
+    } catch (err: any) {
+      alert('保存失败：' + (err?.message || '未知错误'))
+    }
   }
 
   const handleVariableInsert = (variableName: string): void => {
@@ -446,7 +457,7 @@ export default function EmailTemplates(): JSX.Element {
               {extractedVars.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <p className="text-sm">当前模板中暂未使用任何变量</p>
-                  <p className="text-xs mt-1">在左侧编辑区点击"变量"按钮插入占位符后再来填写</p>
+                  <p className="text-xs mt-1">在左侧编辑区点击&#34;变量&#34;按钮插入占位符后再来填写</p>
                 </div>
               ) : (
                 extractedVars.map((varName, i) => (

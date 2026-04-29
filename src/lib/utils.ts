@@ -8,6 +8,8 @@
  */
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { format } from 'date-fns'
+import { zhCN } from 'date-fns/locale'
 
 // ==================== Tailwind CSS 工具 ====================
 export function cn(...inputs: ClassValue[]): string {
@@ -42,24 +44,29 @@ export function serializePolicyTags(tags: string[]): string {
 
 // ==================== 日期工具 ====================
 
+type DateLike = string | Date | null | undefined
+
 /**
- * 格式化日期为本地字符串
- * @param date - 日期字符串或 Date 对象
- * @param options - Intl.DateTimeFormatOptions
+ * 安全解析日期值，无效时返回 null
+ * @param value - 日期字符串、Date 对象或空值
+ * @returns 有效的 Date 对象或 null
+ */
+export function parseValidDate(value: DateLike): Date | null {
+  if (!value) return null
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+/**
+ * 安全格式化日期，无效时返回 fallback
+ * @param value - 日期值
+ * @param pattern - date-fns 格式化模式
+ * @param fallback - 无效日期时的回退值，默认 '--'
  * @returns 格式化后的日期字符串
  */
-export function formatDate(
-  date: string | Date | null | undefined,
-  options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' }
-): string {
-  if (!date) return ''
-  try {
-    const d = typeof date === 'string' ? new Date(date) : date
-    if (isNaN(d.getTime())) return ''
-    return d.toLocaleDateString('zh-CN', options)
-  } catch {
-    return ''
-  }
+export function formatDateSafe(value: DateLike, pattern: string, fallback = '--'): string {
+  const date = parseValidDate(value)
+  return date ? format(date, pattern, { locale: zhCN }) : fallback
 }
 
 /**
@@ -69,16 +76,13 @@ export function formatDate(
  */
 export function getDaysUntilDeadline(deadline: string | null | undefined): number | null {
   if (!deadline) return null
-  try {
-    const deadlineDate = new Date(deadline)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    deadlineDate.setHours(0, 0, 0, 0)
-    const diffTime = deadlineDate.getTime() - today.getTime()
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-  } catch {
-    return null
-  }
+  const deadlineDate = parseValidDate(deadline)
+  if (!deadlineDate) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  deadlineDate.setHours(0, 0, 0, 0)
+  const diffTime = deadlineDate.getTime() - today.getTime()
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 }
 
 // ==================== 验证工具 ====================

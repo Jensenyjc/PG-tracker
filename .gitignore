@@ -11,3 +11,4 @@ dist-mac/
 prisma/dev.db
 *.db
 *.db-journal
+*.tsbuildinfo

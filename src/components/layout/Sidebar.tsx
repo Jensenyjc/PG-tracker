@@ -7,6 +7,7 @@
  * Copyright (c) 2026. All rights reserved.
  */
 import { LayoutDashboard, Kanban, Calendar, Mail, Settings, GraduationCap } from 'lucide-react'
+import { useAppVersion } from '../../lib/useAppVersion'
 
 type View = 'dashboard' | 'kanban' | 'timeline' | 'templates' | 'settings'
 
@@ -25,6 +26,8 @@ const navItems = [
 ]
 
 export default function Sidebar({ currentView, onViewChange, onSelectInstitution }: SidebarProps): JSX.Element {
+  const appVersion = useAppVersion()
+
   return (
     <aside className="w-64 bg-card border-r border-border flex flex-col h-full">
       <div className="p-4 border-b border-border">
@@ -64,7 +67,7 @@ export default function Sidebar({ currentView, onViewChange, onSelectInstitution
 
       <div className="p-4 border-t border-border">
         <p className="text-xs text-muted-foreground text-center">
-          v2.3.0 - 本地数据存储
+          v{appVersion || '...'} - 本地数据存储
         </p>
       </div>
     </aside>
