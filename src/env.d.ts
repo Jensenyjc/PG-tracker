@@ -52,6 +52,7 @@ interface CustomAPI {
     getById: (id: string) => Promise<Institution | null>
     create: (data: InstitutionInput) => Promise<Institution>
     update: (id: string, data: Partial<InstitutionInput>) => Promise<Institution>
+    reorder: (tier: Institution['tier'], orderedIds: string[]) => Promise<boolean>
     delete: (id: string) => Promise<boolean>
   }
   advisor: {

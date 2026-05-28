@@ -7,6 +7,7 @@ const mockApi = {
     getAll: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    reorder: vi.fn(),
     delete: vi.fn(),
   },
   advisor: {
@@ -163,6 +164,43 @@ describe('appStore — updateInstitution', () => {
     expect(mockApi.institution.update).toHaveBeenCalledWith('1', { campDeadline: '2026-06-01' })
     expect(mockApi.institution.getAll).toHaveBeenCalled()
     expect(useStore.getState().institutions).toEqual([updated])
+  })
+})
+
+describe('appStore — reorderInstitutions', () => {
+  it('optimistically reorders one tier and refreshes list', async () => {
+    const schools = [
+      { id: '1', name: 'A', department: 'CS', tier: 'REACH' as const, degreeType: 'MASTER' as const, campDeadline: null, pushDeadline: null, expectedQuota: null, policyTags: '[]', sortOrder: 0, createdAt: '2026-01-01', updatedAt: '' },
+      { id: '2', name: 'B', department: 'CS', tier: 'REACH' as const, degreeType: 'MASTER' as const, campDeadline: null, pushDeadline: null, expectedQuota: null, policyTags: '[]', sortOrder: 1, createdAt: '2026-01-02', updatedAt: '' },
+      { id: '3', name: 'C', department: 'CS', tier: 'MATCH' as const, degreeType: 'MASTER' as const, campDeadline: null, pushDeadline: null, expectedQuota: null, policyTags: '[]', sortOrder: 0, createdAt: '2026-01-03', updatedAt: '' },
+    ]
+    const refreshed = [
+      { ...schools[1], sortOrder: 0 },
+      { ...schools[0], sortOrder: 1 },
+      schools[2],
+    ]
+    useStore.setState({ institutions: schools })
+    mockApi.institution.reorder.mockResolvedValueOnce(true)
+    mockApi.institution.getAll.mockResolvedValueOnce(refreshed)
+
+    await useStore.getState().reorderInstitutions('REACH', ['2', '1'])
+
+    expect(mockApi.institution.reorder).toHaveBeenCalledWith('REACH', ['2', '1'])
+    expect(useStore.getState().institutions).toEqual(refreshed)
+  })
+
+  it('rolls back optimistic order on failure', async () => {
+    const schools = [
+      { id: '1', name: 'A', department: 'CS', tier: 'REACH' as const, degreeType: 'MASTER' as const, campDeadline: null, pushDeadline: null, expectedQuota: null, policyTags: '[]', sortOrder: 0, createdAt: '2026-01-01', updatedAt: '' },
+      { id: '2', name: 'B', department: 'CS', tier: 'REACH' as const, degreeType: 'MASTER' as const, campDeadline: null, pushDeadline: null, expectedQuota: null, policyTags: '[]', sortOrder: 1, createdAt: '2026-01-02', updatedAt: '' },
+    ]
+    useStore.setState({ institutions: schools })
+    mockApi.institution.reorder.mockRejectedValueOnce(new Error('reorder failed'))
+
+    await expect(useStore.getState().reorderInstitutions('REACH', ['2', '1'])).rejects.toThrow('reorder failed')
+
+    expect(useStore.getState().institutions).toEqual(schools)
+    expect(useStore.getState().error).toBe('reorder failed')
   })
 })
 

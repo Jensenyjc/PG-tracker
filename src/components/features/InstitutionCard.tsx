@@ -6,21 +6,40 @@
  * @Date: 2026-04-08
  * Copyright (c) 2026. All rights reserved.
  */
+import type { DragEvent } from 'react'
 import { isPast, differenceInDays } from 'date-fns'
-import { Calendar, AlertCircle, Edit2, Mail, Users } from 'lucide-react'
+import { Calendar, AlertCircle, Edit2, GripVertical, Mail, Users } from 'lucide-react'
 import { Institution } from '../../stores/appStore'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { tierColors, tierLabels, degreeTypeLabels } from '../../lib/constants'
-import { parsePolicyTags, parseValidDate, formatDateSafe } from '../../lib/utils'
+import { cn, parsePolicyTags, parseValidDate, formatDateSafe } from '../../lib/utils'
 
 interface InstitutionCardProps {
   institution: Institution
   onClick: () => void
   onEdit: () => void
+  draggable?: boolean
+  isDragging?: boolean
+  isDragOver?: boolean
+  onDragStart?: (event: DragEvent<HTMLDivElement>) => void
+  onDragOver?: (event: DragEvent<HTMLDivElement>) => void
+  onDrop?: (event: DragEvent<HTMLDivElement>) => void
+  onDragEnd?: (event: DragEvent<HTMLDivElement>) => void
 }
 
-export default function InstitutionCard({ institution, onClick, onEdit }: InstitutionCardProps): JSX.Element {
+export default function InstitutionCard({
+  institution,
+  onClick,
+  onEdit,
+  draggable = false,
+  isDragging = false,
+  isDragOver = false,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd
+}: InstitutionCardProps): JSX.Element {
   const deadline = institution.campDeadline || institution.pushDeadline
   const deadlineDate = parseValidDate(deadline)
   const today = new Date()
@@ -43,7 +62,17 @@ export default function InstitutionCard({ institution, onClick, onEdit }: Instit
 
   return (
     <div
-      className="bg-card rounded-lg border border-border p-3 cursor-pointer hover:shadow-md hover:border-primary/50 transition-all group"
+      className={cn(
+        'bg-card rounded-lg border border-border p-3 cursor-pointer hover:shadow-md hover:border-primary/50 transition-all group',
+        draggable && 'cursor-grab active:cursor-grabbing',
+        isDragging && 'opacity-50 border-primary shadow-md',
+        isDragOver && 'border-primary ring-2 ring-primary/20'
+      )}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
       onClick={onClick}
     >
       <div className="flex items-start justify-between mb-2">
@@ -52,6 +81,11 @@ export default function InstitutionCard({ institution, onClick, onEdit }: Instit
           <p className="text-xs text-muted-foreground truncate">{institution.department}</p>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {draggable && (
+            <span className="h-7 w-7 inline-flex items-center justify-center text-muted-foreground cursor-grab" title="拖动排序" aria-hidden="true">
+              <GripVertical className="h-3.5 w-3.5" />
+            </span>
+          )}
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEdit() }}>
             <Edit2 className="h-3.5 w-3.5" />
           </Button>

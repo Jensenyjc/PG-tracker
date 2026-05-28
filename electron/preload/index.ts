@@ -91,6 +91,7 @@ const api = {
     getById: (id: string) => ipcRenderer.invoke('institution:getById', id),
     create: (data: InstitutionInput) => ipcRenderer.invoke('institution:create', data),
     update: (id: string, data: Partial<InstitutionInput>) => ipcRenderer.invoke('institution:update', id, data),
+    reorder: (tier: 'REACH' | 'MATCH' | 'SAFETY', orderedIds: string[]) => ipcRenderer.invoke('institution:reorder', tier, orderedIds),
     delete: (id: string) => ipcRenderer.invoke('institution:delete', id)
   },
   advisor: {

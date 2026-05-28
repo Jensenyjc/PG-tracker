@@ -18,6 +18,7 @@ export interface Institution {
   pushDeadline: string | null
   expectedQuota: number | null
   policyTags: string
+  sortOrder?: number | null
   createdAt: string
   updatedAt: string
   advisors?: Advisor[]
@@ -128,6 +129,21 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+function getInstitutionSortOrder(institution: Institution): number {
+  return Number.isFinite(institution.sortOrder) ? Number(institution.sortOrder) : 0
+}
+
+function getInstitutionCreatedAtTime(institution: Institution): number {
+  const time = new Date(institution.createdAt).getTime()
+  return Number.isNaN(time) ? 0 : time
+}
+
+function sortInstitutionsForDisplay(a: Institution, b: Institution): number {
+  const orderDiff = getInstitutionSortOrder(a) - getInstitutionSortOrder(b)
+  if (orderDiff !== 0) return orderDiff
+  return getInstitutionCreatedAtTime(b) - getInstitutionCreatedAtTime(a)
+}
+
 interface AppState {
   currentView: View
   selectedInstitutionId: string | null
@@ -143,6 +159,7 @@ interface AppState {
   loadOrphanTasks: () => Promise<void>
   addInstitution: (data: InstitutionInput) => Promise<Institution>
   updateInstitution: (id: string, data: Partial<InstitutionInput>) => Promise<Institution>
+  reorderInstitutions: (tier: Institution['tier'], orderedIds: string[]) => Promise<void>
   deleteInstitution: (id: string) => Promise<void>
   addAdvisor: (data: AdvisorInput) => Promise<Advisor>
   updateAdvisor: (id: string, data: Partial<AdvisorInput>) => Promise<void>
@@ -219,6 +236,33 @@ export const useStore = create<AppState>((set, get) => ({
       return institutions.find((i) => i.id === id) || updated
     } catch (error: unknown) {
       set({ error: getErrorMessage(error), isLoading: false })
+      throw error
+    }
+  },
+
+  reorderInstitutions: async (tier, orderedIds) => {
+    const previousInstitutions = get().institutions
+    const schoolsById = new Map(previousInstitutions.map((institution) => [institution.id, institution]))
+    const orderedIdSet = new Set(orderedIds)
+    const reorderedSchools: Institution[] = []
+    orderedIds.forEach((schoolId, index) => {
+      const school = schoolsById.get(schoolId)
+      if (school) {
+        reorderedSchools.push({ ...school, sortOrder: index })
+      }
+    })
+    const nextInstitutions = [
+      ...previousInstitutions.filter((institution) => institution.tier !== tier || !orderedIdSet.has(institution.id)),
+      ...reorderedSchools
+    ].sort(sortInstitutionsForDisplay)
+
+    set({ institutions: nextInstitutions, error: null })
+    try {
+      await window.api.institution.reorder(tier, orderedIds)
+      const institutions = await window.api.institution.getAll()
+      set({ institutions })
+    } catch (error: unknown) {
+      set({ institutions: previousInstitutions, error: getErrorMessage(error) })
       throw error
     }
   },

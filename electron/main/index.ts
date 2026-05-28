@@ -113,51 +113,62 @@ function backupUserDatabase(userDbPath: string, reason: string): void {
   log.info(`[Prod] Backed up user database before ${reason}:`, backupBasePath)
 }
 
-async function ensureProductionDatabaseSchema(userDbPath: string): Promise<void> {
+async function ensureDatabaseSchema(dbPath: string, shouldBackup: boolean): Promise<void> {
   let tmpPrisma: any = null
   try {
     const { PrismaClient: PC } = require(getPrismaClientPath())
-    tmpPrisma = new PC({ datasources: { db: { url: `file:${userDbPath}` } } })
+    tmpPrisma = new PC({ datasources: { db: { url: `file:${dbPath}` } } })
 
     const rows = await tmpPrisma.$queryRawUnsafe(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('EmailTemplate', 'EmailVariable')"
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('Institution', 'EmailTemplate', 'EmailVariable')"
     )
     const existingTables = new Set((rows as Array<{ name: string }>).map((row) => row.name))
     const needsEmailTables = !existingTables.has('EmailTemplate') || !existingTables.has('EmailVariable')
+    const institutionColumns = existingTables.has('Institution')
+      ? await tmpPrisma.$queryRawUnsafe('PRAGMA table_info("Institution")')
+      : []
+    const needsInstitutionSortOrder = existingTables.has('Institution') && !((institutionColumns as Array<{ name: string }>).some((column) => column.name === 'sortOrder'))
 
-    if (!needsEmailTables) {
-      log.info('[Prod] User database schema is up to date')
+    if (!needsEmailTables && !needsInstitutionSortOrder) {
+      log.info('[DB] Database schema is up to date')
       return
     }
 
-    backupUserDatabase(userDbPath, 'schema migration')
-    log.warn('[Prod] User database schema is missing email tables. Applying non-destructive migration.')
+    if (shouldBackup) {
+      backupUserDatabase(dbPath, 'schema migration')
+    }
+    log.warn('[DB] Database schema is missing fields or tables. Applying non-destructive migration.')
 
     await tmpPrisma.$executeRawUnsafe('BEGIN IMMEDIATE')
     try {
-      await tmpPrisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "EmailTemplate" (
-          "id" TEXT NOT NULL PRIMARY KEY,
-          "name" TEXT NOT NULL,
-          "subject" TEXT NOT NULL,
-          "content" TEXT NOT NULL,
-          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "updatedAt" DATETIME NOT NULL
-        )
-      `)
-      await tmpPrisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "EmailVariable" (
-          "id" TEXT NOT NULL PRIMARY KEY,
-          "name" TEXT NOT NULL,
-          "templateId" TEXT NOT NULL,
-          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "EmailVariable_templateId_fkey"
-            FOREIGN KEY ("templateId") REFERENCES "EmailTemplate" ("id")
-            ON DELETE CASCADE ON UPDATE CASCADE
-        )
-      `)
+      if (needsInstitutionSortOrder) {
+        await tmpPrisma.$executeRawUnsafe('ALTER TABLE "Institution" ADD COLUMN "sortOrder" INTEGER NOT NULL DEFAULT 0')
+      }
+      if (needsEmailTables) {
+        await tmpPrisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "EmailTemplate" (
+            "id" TEXT NOT NULL PRIMARY KEY,
+            "name" TEXT NOT NULL,
+            "subject" TEXT NOT NULL,
+            "content" TEXT NOT NULL,
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" DATETIME NOT NULL
+          )
+        `)
+        await tmpPrisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "EmailVariable" (
+            "id" TEXT NOT NULL PRIMARY KEY,
+            "name" TEXT NOT NULL,
+            "templateId" TEXT NOT NULL,
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT "EmailVariable_templateId_fkey"
+              FOREIGN KEY ("templateId") REFERENCES "EmailTemplate" ("id")
+              ON DELETE CASCADE ON UPDATE CASCADE
+          )
+        `)
+      }
       await tmpPrisma.$executeRawUnsafe('COMMIT')
-      log.info('[Prod] Database schema migration completed without replacing user data')
+      log.info('[DB] Database schema migration completed without replacing user data')
     } catch (migrationError) {
       try { await tmpPrisma.$executeRawUnsafe('ROLLBACK') } catch {}
       throw migrationError
@@ -194,6 +205,7 @@ async function createDatabaseSchema(dbPath: string): Promise<void> {
           "pushDeadline" DATETIME,
           "expectedQuota" INTEGER,
           "policyTags" TEXT NOT NULL DEFAULT '[]',
+          "sortOrder" INTEGER NOT NULL DEFAULT 0,
           "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
@@ -286,6 +298,7 @@ async function initializeDatabase(): Promise<string> {
 
   if (isDev) {
     log.info('[Dev] Using local dev database at:', dbPath)
+    await ensureDatabaseSchema(dbPath, false)
     return dbPath
   }
 
@@ -317,10 +330,11 @@ async function initializeDatabase(): Promise<string> {
         throw schemaErr
       }
     }
+    await ensureDatabaseSchema(userDbPath, false)
     return userDbPath
   }
 
-  await ensureProductionDatabaseSchema(userDbPath)
+  await ensureDatabaseSchema(userDbPath, true)
   return userDbPath
 }
 
@@ -437,6 +451,28 @@ function parseDateRequired(value: unknown, fieldName: string): Date {
   return parsed
 }
 
+function parseSortOrder(value: unknown): number {
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error('sortOrder must be a non-negative integer')
+  }
+  return parsed
+}
+
+function parseInstitutionTier(value: unknown): 'REACH' | 'MATCH' | 'SAFETY' {
+  if (value === 'REACH' || value === 'MATCH' || value === 'SAFETY') {
+    return value
+  }
+  throw new Error('Invalid institution tier')
+}
+
+function parseOrderedInstitutionIds(value: unknown): string[] {
+  if (!Array.isArray(value) || !value.every((id) => typeof id === 'string' && id.length > 0)) {
+    throw new Error('orderedIds must be a string array')
+  }
+  return value
+}
+
 function buildInstitutionUpdateData(data: unknown): JsonRecord {
   const input = toRecord(data, 'institution update data')
   const updateData: JsonRecord = {}
@@ -451,6 +487,7 @@ function buildInstitutionUpdateData(data: unknown): JsonRecord {
   if (input.policyTags !== undefined) {
     updateData.policyTags = JSON.stringify(Array.isArray(input.policyTags) ? input.policyTags : [])
   }
+  if (input.sortOrder !== undefined) updateData.sortOrder = parseSortOrder(input.sortOrder)
 
   return updateData
 }
@@ -532,7 +569,7 @@ ipcMain.handle('institution:getAll', async () => {
         advisors: { include: { assets: true, interviews: true } },
         tasks: true
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }]
     })
   } catch (error) {
     log.error('Error fetching institutions:', error)
@@ -559,16 +596,22 @@ ipcMain.handle('institution:getById', async (_, id: string) => {
 ipcMain.handle('institution:create', async (_, data: any) => {
   try {
     const client = await getPrisma()
+    const tier = parseInstitutionTier(data.tier)
+    const maxOrder = await client.institution.aggregate({
+      where: { tier },
+      _max: { sortOrder: true }
+    })
     return await client.institution.create({
       data: {
         name: data.name,
         department: data.department,
-        tier: data.tier,
+        tier,
         degreeType: data.degreeType,
         campDeadline: parseNullableDate(data.campDeadline, 'campDeadline'),
         pushDeadline: parseNullableDate(data.pushDeadline, 'pushDeadline'),
         expectedQuota: data.expectedQuota,
-        policyTags: JSON.stringify(data.policyTags || [])
+        policyTags: JSON.stringify(data.policyTags || []),
+        sortOrder: (maxOrder._max.sortOrder ?? -1) + 1
       },
       include: { advisors: true, tasks: true }
     })
@@ -581,7 +624,22 @@ ipcMain.handle('institution:create', async (_, data: any) => {
 ipcMain.handle('institution:update', async (_, id: string, data: any) => {
   try {
     const client = await getPrisma()
-    const updateData = buildInstitutionUpdateData(data)
+    const input = toRecord(data, 'institution update data')
+    const updateData = buildInstitutionUpdateData(input)
+    if (input.tier !== undefined && updateData.sortOrder === undefined) {
+      const tier = parseInstitutionTier(input.tier)
+      const existing = await client.institution.findUnique({
+        where: { id },
+        select: { tier: true }
+      })
+      if (existing && existing.tier !== tier) {
+        const maxOrder = await client.institution.aggregate({
+          where: { tier, id: { not: id } },
+          _max: { sortOrder: true }
+        })
+        updateData.sortOrder = (maxOrder._max.sortOrder ?? -1) + 1
+      }
+    }
     if (Object.keys(updateData).length === 0) {
       return await client.institution.findUnique({
         where: { id },
@@ -595,6 +653,38 @@ ipcMain.handle('institution:update', async (_, id: string, data: any) => {
     })
   } catch (error) {
     log.error('Error updating institution:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('institution:reorder', async (_, tierValue: unknown, orderedIdsValue: unknown) => {
+  try {
+    const client = await getPrisma()
+    const tier = parseInstitutionTier(tierValue)
+    const orderedIds = parseOrderedInstitutionIds(orderedIdsValue)
+    const uniqueIds = new Set(orderedIds)
+    if (uniqueIds.size !== orderedIds.length) {
+      throw new Error('orderedIds cannot contain duplicates')
+    }
+
+    const currentSchools = await client.institution.findMany({
+      where: { tier },
+      select: { id: true }
+    })
+    const currentIds = new Set(currentSchools.map((school: { id: string }) => school.id))
+    if (orderedIds.length !== currentIds.size || !orderedIds.every((schoolId) => currentIds.has(schoolId))) {
+      throw new Error('排序数据与当前分组不一致，请刷新后重试')
+    }
+
+    await client.$transaction(
+      orderedIds.map((schoolId, index) => client.institution.update({
+        where: { id: schoolId },
+        data: { sortOrder: index }
+      }))
+    )
+    return true
+  } catch (error) {
+    log.error('Error reordering institutions:', error)
     throw error
   }
 })

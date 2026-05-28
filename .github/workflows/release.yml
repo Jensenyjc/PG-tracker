@@ -26,7 +26,7 @@ jobs:
       - name: Upload
         uses: softprops/action-gh-release@v2
         with:
-          files: release/*.exe
+          files: release/*
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
