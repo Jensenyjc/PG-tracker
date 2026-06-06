@@ -94,9 +94,10 @@
 #### 下载
 
 1. 打开 [Releases](https://github.com/Jensenyjc/PG-tracker/releases) 页面
-2. 在最新版本（v3.0.0）的 Assets 中，找到以下任意文件：
-   - **`PG-Tracker-3.0.0-mac-x64.dmg`** — 推荐，图形化安装界面
-   - **`PG-Tracker-3.0.0-mac-x64.zip`** — 便携版，无需安装
+2. 在最新版本（v3.0.0）的 Assets 中，找到适合你电脑芯片的文件：
+   - **`PG-Tracker-3.0.0-mac-arm64.dmg`** — Apple Silicon 芯片推荐
+   - **`PG-Tracker-3.0.0-mac-x64.dmg`** — Intel 芯片推荐
+   - **`PG-Tracker-3.0.0-mac-arm64.zip`** / **`PG-Tracker-3.0.0-mac-x64.zip`** — 便携版，无需安装
 
 #### 安装步骤
 
@@ -147,8 +148,8 @@ macOS 默认只允许运行来自 App Store 的已签名应用，首次打开未
 
 1. 打开 [Releases](https://github.com/Jensenyjc/PG-tracker/releases) 页面
 2. 在最新版本（v3.0.0）的 Assets 中，找到以下任意文件：
-   - **`PG-Tracker-3.0.0-linux-x64.AppImage`** — 推荐，便携免安装
-   - **`PG-Tracker-3.0.0-linux-x64.deb`** — Debian/Ubuntu 系专用安装包
+   - **`PG-Tracker-3.0.0-linux-x86_64.AppImage`** — 推荐，便携免安装
+   - **`PG-Tracker-3.0.0-linux-amd64.deb`** — Debian/Ubuntu 系专用安装包
 
 #### 安装步骤
 
@@ -163,7 +164,7 @@ macOS 默认只允许运行来自 App Store 的已签名应用，首次打开未
    **终端方式：**
    ```bash
    cd ~/Downloads
-   chmod +x PG-Tracker-3.0.0-linux-x64.AppImage
+   chmod +x PG-Tracker-3.0.0-linux-x86_64.AppImage
    ```
 
 3. 双击文件即可运行，**无需安装**
@@ -174,7 +175,7 @@ macOS 默认只允许运行来自 App Store 的已签名应用，首次打开未
 2. 点击"安装"，输入密码，等待安装完成
 3. 若遇到依赖问题，在终端运行以下命令修复：
    ```bash
-   sudo dpkg -i ~/Downloads/PG-Tracker-3.0.0-linux-x64.deb
+   sudo dpkg -i ~/Downloads/PG-Tracker-3.0.0-linux-amd64.deb
    sudo apt-get install -f
    ```
 
