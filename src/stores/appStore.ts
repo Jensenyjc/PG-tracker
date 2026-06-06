@@ -64,6 +64,21 @@ export interface Interview {
   markdownNotes: string
 }
 
+export interface PersonalResource {
+  id: string
+  name: string
+  localPath: string
+  kind: 'FILE' | 'FOLDER'
+  fileType: string | null
+  category: string
+  tags: string
+  notes: string | null
+  sizeBytes: number | null
+  modifiedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface EmailVariable {
   id: string
   name: string
@@ -123,7 +138,17 @@ export interface InterviewInput {
   markdownNotes: string
 }
 
-type View = 'dashboard' | 'kanban' | 'timeline' | 'templates' | 'settings'
+export interface PersonalResourceInput {
+  name?: string
+  localPath: string
+  kind?: PersonalResource['kind']
+  fileType?: string | null
+  category?: string
+  tags?: string[]
+  notes?: string | null
+}
+
+type View = 'dashboard' | 'kanban' | 'timeline' | 'templates' | 'resources' | 'settings'
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -149,6 +174,7 @@ interface AppState {
   selectedInstitutionId: string | null
   institutions: Institution[]
   orphanTasks: Task[]
+  personalResources: PersonalResource[]
   isLoading: boolean
   error: string | null
   conflictWarnings: string[]
@@ -157,9 +183,11 @@ interface AppState {
   setSelectedInstitutionId: (id: string | null) => void
   loadInstitutions: () => Promise<void>
   loadOrphanTasks: () => Promise<void>
+  loadPersonalResources: () => Promise<void>
   addInstitution: (data: InstitutionInput) => Promise<Institution>
   updateInstitution: (id: string, data: Partial<InstitutionInput>) => Promise<Institution>
   reorderInstitutions: (tier: Institution['tier'], orderedIds: string[]) => Promise<void>
+  moveInstitutionToTier: (id: string, targetTier: Institution['tier'], orderedIds: string[]) => Promise<void>
   deleteInstitution: (id: string) => Promise<void>
   addAdvisor: (data: AdvisorInput) => Promise<Advisor>
   updateAdvisor: (id: string, data: Partial<AdvisorInput>) => Promise<void>
@@ -172,6 +200,10 @@ interface AppState {
   addInterview: (data: InterviewInput) => Promise<Interview>
   updateInterview: (id: string, data: Partial<InterviewInput>) => Promise<void>
   deleteInterview: (id: string) => Promise<void>
+  addPersonalResource: (data: PersonalResourceInput) => Promise<PersonalResource>
+  addPersonalResourcesFromPaths: (paths: string[], category?: string) => Promise<void>
+  updatePersonalResource: (id: string, data: Partial<PersonalResourceInput>) => Promise<PersonalResource>
+  deletePersonalResource: (id: string) => Promise<void>
   checkConflicts: (institutionId: string) => Promise<void>
   clearError: () => void
   loadEmailTemplates: () => Promise<void>
@@ -187,6 +219,7 @@ export const useStore = create<AppState>((set, get) => ({
   selectedInstitutionId: null,
   institutions: [],
   orphanTasks: [],
+  personalResources: [],
   isLoading: false,
   error: null,
   conflictWarnings: [],
@@ -240,6 +273,15 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
+  loadPersonalResources: async () => {
+    try {
+      const resources = await window.api.personalResource.getAll()
+      set({ personalResources: resources })
+    } catch (error: unknown) {
+      set({ error: getErrorMessage(error) })
+    }
+  },
+
   reorderInstitutions: async (tier, orderedIds) => {
     const previousInstitutions = get().institutions
     const schoolsById = new Map(previousInstitutions.map((institution) => [institution.id, institution]))
@@ -259,6 +301,45 @@ export const useStore = create<AppState>((set, get) => ({
     set({ institutions: nextInstitutions, error: null })
     try {
       await window.api.institution.reorder(tier, orderedIds)
+      const institutions = await window.api.institution.getAll()
+      set({ institutions })
+    } catch (error: unknown) {
+      set({ institutions: previousInstitutions, error: getErrorMessage(error) })
+      throw error
+    }
+  },
+
+  moveInstitutionToTier: async (id, targetTier, orderedIds) => {
+    const previousInstitutions = get().institutions
+    const movingInstitution = previousInstitutions.find((institution) => institution.id === id)
+    if (!movingInstitution) {
+      const error = new Error('院校不存在或尚未加载')
+      set({ error: error.message })
+      throw error
+    }
+
+    const targetOrder = new Map(orderedIds.map((schoolId, index) => [schoolId, index]))
+    const sourceOrder = new Map(
+      previousInstitutions
+        .filter((institution) => institution.tier === movingInstitution.tier && institution.id !== id)
+        .map((institution, index) => [institution.id, index])
+    )
+    const nextInstitutions = previousInstitutions.map((institution) => {
+      if (institution.id === id) {
+        return { ...institution, tier: targetTier, sortOrder: targetOrder.get(institution.id) ?? 0 }
+      }
+      if (institution.tier === targetTier && targetOrder.has(institution.id)) {
+        return { ...institution, sortOrder: targetOrder.get(institution.id) ?? 0 }
+      }
+      if (movingInstitution.tier !== targetTier && institution.tier === movingInstitution.tier && sourceOrder.has(institution.id)) {
+        return { ...institution, sortOrder: sourceOrder.get(institution.id) ?? 0 }
+      }
+      return institution
+    }).sort(sortInstitutionsForDisplay)
+
+    set({ institutions: nextInstitutions, error: null })
+    try {
+      await window.api.institution.move(id, targetTier, orderedIds)
       const institutions = await window.api.institution.getAll()
       set({ institutions })
     } catch (error: unknown) {
@@ -398,6 +479,55 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       await window.api.interview.delete(id)
       await get().loadInstitutions()
+    } catch (error: unknown) {
+      set({ error: getErrorMessage(error) })
+      throw error
+    }
+  },
+
+  addPersonalResource: async (data) => {
+    try {
+      const resource = await window.api.personalResource.create(data)
+      set((state) => ({ personalResources: [resource, ...state.personalResources] }))
+      await get().loadPersonalResources()
+      return resource
+    } catch (error: unknown) {
+      set({ error: getErrorMessage(error) })
+      throw error
+    }
+  },
+
+  addPersonalResourcesFromPaths: async (paths, category = '其他') => {
+    try {
+      for (const localPath of paths) {
+        await window.api.personalResource.create({ localPath, category })
+      }
+      await get().loadPersonalResources()
+    } catch (error: unknown) {
+      set({ error: getErrorMessage(error) })
+      throw error
+    }
+  },
+
+  updatePersonalResource: async (id, data) => {
+    try {
+      const updated = await window.api.personalResource.update(id, data)
+      set((state) => ({
+        personalResources: state.personalResources.map((resource) => resource.id === id ? updated : resource)
+      }))
+      return updated
+    } catch (error: unknown) {
+      set({ error: getErrorMessage(error) })
+      throw error
+    }
+  },
+
+  deletePersonalResource: async (id) => {
+    try {
+      await window.api.personalResource.delete(id)
+      set((state) => ({
+        personalResources: state.personalResources.filter((resource) => resource.id !== id)
+      }))
     } catch (error: unknown) {
       set({ error: getErrorMessage(error) })
       throw error

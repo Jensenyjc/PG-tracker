@@ -19,6 +19,7 @@ import EmailTemplates from './components/features/EmailTemplates'
 import Settings from './components/features/Settings'
 import Dashboard from './components/features/Dashboard'
 import UpdateNotification from './components/features/UpdateNotification'
+import ResourceLibrary from './components/features/ResourceLibrary'
 
 function App(): JSX.Element {
   const { currentView, selectedInstitutionId, setView, setSelectedInstitutionId, loadInstitutions, institutions, isLoading } = useStore()
@@ -66,6 +67,8 @@ function App(): JSX.Element {
         return <Timeline institutions={institutions} />
       case 'templates':
         return <EmailTemplates />
+      case 'resources':
+        return <ResourceLibrary />
       case 'settings':
         return <Settings />
       case 'kanban':

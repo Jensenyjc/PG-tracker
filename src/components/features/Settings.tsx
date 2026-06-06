@@ -73,13 +73,13 @@ export default function Settings(): JSX.Element | null {
         try {
           const content = await readFile()
           const data = JSON.parse(content)
-          // 检测新旧格式：新格式包含 institutions + emailTemplates 字段，旧格式是纯数组
-          const payload = data.institutions !== undefined || data.orphanTasks !== undefined || data.emailTemplates !== undefined
+          // 检测新旧格式：新格式包含 institutions + emailTemplates + personalResources 字段，旧格式是纯数组
+          const payload = data.institutions !== undefined || data.orphanTasks !== undefined || data.emailTemplates !== undefined || data.personalResources !== undefined
             ? data
             : Array.isArray(data)
               ? { institutions: data }
               : {}
-          const hasImportableData = Array.isArray(payload.institutions) || Array.isArray(payload.orphanTasks) || Array.isArray(payload.emailTemplates)
+          const hasImportableData = Array.isArray(payload.institutions) || Array.isArray(payload.orphanTasks) || Array.isArray(payload.emailTemplates) || Array.isArray(payload.personalResources)
           if (!hasImportableData) {
             alert('导入失败：无效的数据格式')
             return
@@ -92,10 +92,11 @@ export default function Settings(): JSX.Element | null {
             alert('导入失败：' + (result.error || '无效的数据格式'))
             return
           }
-          const { institutions: instCount, orphanTasks, emailTemplates: tplCount } = result.data || {}
+          const { institutions: instCount, orphanTasks, emailTemplates: tplCount, personalResources } = result.data || {}
           const parts = [`${instCount || 0} 所院校`]
           if (orphanTasks) parts.push(`${orphanTasks} 个独立任务`)
           if (tplCount) parts.push(`${tplCount} 个邮件模板`)
+          if (personalResources) parts.push(`${personalResources} 条资料库记录`)
           alert(`导入成功！共导入 ${parts.join('、')}及关联的导师、文件、面经数据。`)
           window.location.reload()
         } catch {

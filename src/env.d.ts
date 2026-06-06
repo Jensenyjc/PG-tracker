@@ -17,6 +17,8 @@ import type {
   InstitutionInput,
   Interview,
   InterviewInput,
+  PersonalResource,
+  PersonalResourceInput,
   Task,
   TaskInput,
   TaskUpdate
@@ -41,6 +43,7 @@ interface BackupData {
   institutions?: Institution[]
   orphanTasks?: Task[]
   emailTemplates?: EmailTemplate[]
+  personalResources?: PersonalResource[]
 }
 
 interface CustomAPI {
@@ -53,6 +56,7 @@ interface CustomAPI {
     create: (data: InstitutionInput) => Promise<Institution>
     update: (id: string, data: Partial<InstitutionInput>) => Promise<Institution>
     reorder: (tier: Institution['tier'], orderedIds: string[]) => Promise<boolean>
+    move: (id: string, tier: Institution['tier'], orderedIds: string[]) => Promise<boolean>
     delete: (id: string) => Promise<boolean>
   }
   advisor: {
@@ -78,8 +82,15 @@ interface CustomAPI {
     update: (id: string, data: Partial<InterviewInput>) => Promise<Interview>
     delete: (id: string) => Promise<boolean>
   }
+  personalResource: {
+    getAll: () => Promise<PersonalResource[]>
+    create: (data: PersonalResourceInput) => Promise<PersonalResource>
+    update: (id: string, data: Partial<PersonalResourceInput>) => Promise<PersonalResource>
+    delete: (id: string) => Promise<boolean>
+  }
   file: {
     selectFile: (options?: FileSelectOptions) => Promise<string | null>
+    selectPaths: (options?: FileSelectOptions) => Promise<string[]>
     openExternal: (path: string) => Promise<boolean>
     compileLatex: (texPath: string) => Promise<{ success: boolean; stdout?: string; stderr?: string; error?: string }>
   }
@@ -95,9 +106,9 @@ interface CustomAPI {
     delete: (id: string) => Promise<ApiResponse>
   }
   backup: {
-    exportAll: () => Promise<ApiResponse<{ version: string; exportedAt: string; institutions: Institution[]; orphanTasks: Task[]; emailTemplates: EmailTemplate[] }>>
+    exportAll: () => Promise<ApiResponse<{ version: string; exportedAt: string; institutions: Institution[]; orphanTasks: Task[]; emailTemplates: EmailTemplate[]; personalResources: PersonalResource[] }>>
     clearAll: () => Promise<ApiResponse>
-    importAll: (data: BackupData, options?: { mode?: 'replace' | 'append' }) => Promise<ApiResponse<{ institutions: number; orphanTasks: number; emailTemplates: number }>>
+    importAll: (data: BackupData, options?: { mode?: 'replace' | 'append' }) => Promise<ApiResponse<{ institutions: number; orphanTasks: number; emailTemplates: number; personalResources: number }>>
   }
   updater: {
     check: () => Promise<ApiResponse>

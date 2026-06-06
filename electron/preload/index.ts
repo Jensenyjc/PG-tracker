@@ -8,10 +8,12 @@
  */
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 
+type InstitutionTier = 'REACH' | 'MATCH' | 'SAFETY'
+
 interface InstitutionInput {
   name: string
   department: string
-  tier: 'REACH' | 'MATCH' | 'SAFETY'
+  tier: InstitutionTier
   degreeType: 'MASTER' | 'PROFESSIONAL' | 'PHD'
   campDeadline: string | Date | null
   pushDeadline: string | Date | null
@@ -56,6 +58,16 @@ interface InterviewInput {
   markdownNotes: string
 }
 
+interface PersonalResourceInput {
+  name?: string
+  localPath: string
+  kind?: 'FILE' | 'FOLDER'
+  fileType?: string | null
+  category?: string
+  tags?: string[]
+  notes?: string | null
+}
+
 interface FileSelectOptions {
   title?: string
   filters?: Array<{ name: string; extensions: string[] }>
@@ -91,7 +103,8 @@ const api = {
     getById: (id: string) => ipcRenderer.invoke('institution:getById', id),
     create: (data: InstitutionInput) => ipcRenderer.invoke('institution:create', data),
     update: (id: string, data: Partial<InstitutionInput>) => ipcRenderer.invoke('institution:update', id, data),
-    reorder: (tier: 'REACH' | 'MATCH' | 'SAFETY', orderedIds: string[]) => ipcRenderer.invoke('institution:reorder', tier, orderedIds),
+    reorder: (tier: InstitutionTier, orderedIds: string[]) => ipcRenderer.invoke('institution:reorder', tier, orderedIds),
+    move: (id: string, tier: InstitutionTier, orderedIds: string[]) => ipcRenderer.invoke('institution:move', id, tier, orderedIds),
     delete: (id: string) => ipcRenderer.invoke('institution:delete', id)
   },
   advisor: {
@@ -117,8 +130,15 @@ const api = {
     update: (id: string, data: Partial<InterviewInput>) => ipcRenderer.invoke('interview:update', id, data),
     delete: (id: string) => ipcRenderer.invoke('interview:delete', id)
   },
+  personalResource: {
+    getAll: () => ipcRenderer.invoke('personalResource:getAll'),
+    create: (data: PersonalResourceInput) => ipcRenderer.invoke('personalResource:create', data),
+    update: (id: string, data: Partial<PersonalResourceInput>) => ipcRenderer.invoke('personalResource:update', id, data),
+    delete: (id: string) => ipcRenderer.invoke('personalResource:delete', id)
+  },
   file: {
     selectFile: (options?: FileSelectOptions) => ipcRenderer.invoke('file:selectFile', options),
+    selectPaths: (options?: FileSelectOptions) => ipcRenderer.invoke('file:selectPaths', options),
     openExternal: (path: string) => ipcRenderer.invoke('file:openExternal', path),
     compileLatex: (texPath: string) => ipcRenderer.invoke('file:compileLatex', texPath)
   },

@@ -26,14 +26,15 @@ const tierConfig = {
   SAFETY: { label: '保', color: 'text-safety', borderColor: 'border-safety' }
 }
 
-function reorderSchoolIds(schools: Institution[], draggedId: string, targetId: string | null): string[] {
+function getOrderedSchoolIdsForDrop(schools: Institution[], draggedId: string, targetId: string | null): string[] {
   const orderedIds = schools.map((school) => school.id)
   const fromIndex = orderedIds.indexOf(draggedId)
-  if (fromIndex === -1) return orderedIds
+  if (fromIndex !== -1) {
+    orderedIds.splice(fromIndex, 1)
+  }
 
-  const [draggedSchoolId] = orderedIds.splice(fromIndex, 1)
   const targetIndex = targetId ? orderedIds.indexOf(targetId) : orderedIds.length
-  orderedIds.splice(targetIndex === -1 ? orderedIds.length : targetIndex, 0, draggedSchoolId)
+  orderedIds.splice(targetIndex === -1 ? orderedIds.length : targetIndex, 0, draggedId)
   return orderedIds
 }
 
@@ -42,7 +43,7 @@ function hasSameOrder(left: string[], right: string[]): boolean {
 }
 
 export default function KanbanBoard({ onSelectInstitution }: KanbanBoardProps): JSX.Element {
-  const { institutions, reorderInstitutions } = useStore()
+  const { institutions, reorderInstitutions, moveInstitutionToTier } = useStore()
   const [showForm, setShowForm] = useState(false)
   const [editingInstitution, setEditingInstitution] = useState<Institution | null>(null)
   const [activeTab, setActiveTab] = useState('all')
@@ -85,7 +86,7 @@ export default function KanbanBoard({ onSelectInstitution }: KanbanBoardProps): 
   }
 
   const handleDragOverCard = (event: DragEvent<HTMLDivElement>, school: Institution): void => {
-    if (!draggedSchool || draggedSchool.tier !== school.tier || draggedSchool.id === school.id) return
+    if (!draggedSchool || draggedSchool.id === school.id) return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
     setDragOverTier(school.tier)
@@ -93,34 +94,38 @@ export default function KanbanBoard({ onSelectInstitution }: KanbanBoardProps): 
   }
 
   const handleDragOverColumn = (event: DragEvent<HTMLDivElement>, tier: Tier): void => {
-    if (!draggedSchool || draggedSchool.tier !== tier) return
+    if (!draggedSchool) return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
     setDragOverTier(tier)
   }
 
-  const persistReorder = async (tier: Tier, targetId: string | null): Promise<void> => {
-    if (!draggedSchool || draggedSchool.tier !== tier) return
+  const persistDrop = async (tier: Tier, targetId: string | null): Promise<void> => {
+    if (!draggedSchool) return
     const schools = getSchoolsForTier(tier)
     const currentIds = schools.map((school) => school.id)
-    const orderedIds = reorderSchoolIds(schools, draggedSchool.id, targetId)
-    if (hasSameOrder(currentIds, orderedIds)) return
+    const orderedIds = getOrderedSchoolIdsForDrop(schools, draggedSchool.id, targetId)
+    if (draggedSchool.tier === tier && hasSameOrder(currentIds, orderedIds)) return
     try {
-      await reorderInstitutions(tier, orderedIds)
+      if (draggedSchool.tier === tier) {
+        await reorderInstitutions(tier, orderedIds)
+      } else {
+        await moveInstitutionToTier(draggedSchool.id, tier, orderedIds)
+      }
     } catch {
-      // Store rolls the optimistic order back and exposes the error state.
+      // Store rolls optimistic changes back and exposes the error state.
     }
   }
 
   const handleDropOnCard = (event: DragEvent<HTMLDivElement>, school: Institution): void => {
     event.preventDefault()
     event.stopPropagation()
-    void persistReorder(school.tier, school.id).finally(resetDragState)
+    void persistDrop(school.tier, school.id).finally(resetDragState)
   }
 
   const handleDropOnColumn = (event: DragEvent<HTMLDivElement>, tier: Tier): void => {
     event.preventDefault()
-    void persistReorder(tier, null).finally(resetDragState)
+    void persistDrop(tier, null).finally(resetDragState)
   }
 
   const handleDragEnd = (): void => {

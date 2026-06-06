@@ -6,10 +6,10 @@
  * @Date: 2026-04-08
  * Copyright (c) 2026. All rights reserved.
  */
-import { LayoutDashboard, Kanban, Calendar, Mail, Settings, GraduationCap } from 'lucide-react'
+import { LayoutDashboard, Kanban, Calendar, Mail, Settings, GraduationCap, Database } from 'lucide-react'
 import { useAppVersion } from '../../lib/useAppVersion'
 
-type View = 'dashboard' | 'kanban' | 'timeline' | 'templates' | 'settings'
+type View = 'dashboard' | 'kanban' | 'timeline' | 'templates' | 'resources' | 'settings'
 
 interface SidebarProps {
   currentView: View
@@ -22,6 +22,7 @@ const navItems = [
   { id: 'kanban' as View, label: '院校看板', icon: <Kanban className="w-5 h-5" /> },
   { id: 'timeline' as View, label: '日程', icon: <Calendar className="w-5 h-5" /> },
   { id: 'templates' as View, label: '邮件模板', icon: <Mail className="w-5 h-5" /> },
+  { id: 'resources' as View, label: '资料库', icon: <Database className="w-5 h-5" /> },
   { id: 'settings' as View, label: '设置', icon: <Settings className="w-5 h-5" /> }
 ]
 

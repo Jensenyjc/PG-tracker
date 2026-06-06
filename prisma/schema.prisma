@@ -94,3 +94,18 @@ model EmailVariable {
   template    EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   createdAt   DateTime      @default(now())
 }
+
+model PersonalResource {
+  id          String   @id @default(uuid())
+  name        String
+  localPath   String
+  kind        String   // FILE, FOLDER
+  fileType    String?
+  category    String
+  tags        String   // JSON 格式存储标签
+  notes       String?
+  sizeBytes   Int?
+  modifiedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

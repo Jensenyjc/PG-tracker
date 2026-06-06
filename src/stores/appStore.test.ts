@@ -8,6 +8,7 @@ const mockApi = {
     create: vi.fn(),
     update: vi.fn(),
     reorder: vi.fn(),
+    move: vi.fn(),
     delete: vi.fn(),
   },
   advisor: {
@@ -27,6 +28,12 @@ const mockApi = {
     delete: vi.fn(),
   },
   interview: {
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
+  personalResource: {
+    getAll: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -53,6 +60,7 @@ beforeEach(() => {
     selectedInstitutionId: null,
     institutions: [],
     orphanTasks: [],
+    personalResources: [],
     isLoading: false,
     error: null,
     conflictWarnings: [],
@@ -204,6 +212,43 @@ describe('appStore — reorderInstitutions', () => {
   })
 })
 
+describe('appStore — moveInstitutionToTier', () => {
+  it('moves an institution to another tier and refreshes list', async () => {
+    const schools = [
+      { id: '1', name: 'A', department: 'CS', tier: 'REACH' as const, degreeType: 'MASTER' as const, campDeadline: null, pushDeadline: null, expectedQuota: null, policyTags: '[]', sortOrder: 0, createdAt: '2026-01-01', updatedAt: '' },
+      { id: '2', name: 'B', department: 'CS', tier: 'MATCH' as const, degreeType: 'MASTER' as const, campDeadline: null, pushDeadline: null, expectedQuota: null, policyTags: '[]', sortOrder: 0, createdAt: '2026-01-02', updatedAt: '' },
+      { id: '3', name: 'C', department: 'CS', tier: 'MATCH' as const, degreeType: 'MASTER' as const, campDeadline: null, pushDeadline: null, expectedQuota: null, policyTags: '[]', sortOrder: 1, createdAt: '2026-01-03', updatedAt: '' },
+    ]
+    const refreshed = [
+      { ...schools[0], tier: 'MATCH' as const, sortOrder: 0 },
+      { ...schools[1], sortOrder: 1 },
+      { ...schools[2], sortOrder: 2 },
+    ]
+    useStore.setState({ institutions: schools })
+    mockApi.institution.move.mockResolvedValueOnce(true)
+    mockApi.institution.getAll.mockResolvedValueOnce(refreshed)
+
+    await useStore.getState().moveInstitutionToTier('1', 'MATCH', ['1', '2', '3'])
+
+    expect(mockApi.institution.move).toHaveBeenCalledWith('1', 'MATCH', ['1', '2', '3'])
+    expect(useStore.getState().institutions).toEqual(refreshed)
+  })
+
+  it('rolls back optimistic tier move on failure', async () => {
+    const schools = [
+      { id: '1', name: 'A', department: 'CS', tier: 'REACH' as const, degreeType: 'MASTER' as const, campDeadline: null, pushDeadline: null, expectedQuota: null, policyTags: '[]', sortOrder: 0, createdAt: '2026-01-01', updatedAt: '' },
+      { id: '2', name: 'B', department: 'CS', tier: 'MATCH' as const, degreeType: 'MASTER' as const, campDeadline: null, pushDeadline: null, expectedQuota: null, policyTags: '[]', sortOrder: 0, createdAt: '2026-01-02', updatedAt: '' },
+    ]
+    useStore.setState({ institutions: schools })
+    mockApi.institution.move.mockRejectedValueOnce(new Error('move failed'))
+
+    await expect(useStore.getState().moveInstitutionToTier('1', 'MATCH', ['2', '1'])).rejects.toThrow('move failed')
+
+    expect(useStore.getState().institutions).toEqual(schools)
+    expect(useStore.getState().error).toBe('move failed')
+  })
+})
+
 describe('appStore — deleteInstitution', () => {
   it('removes from local state without refetching all', async () => {
     useStore.setState({ institutions: [{ id: '1', name: '清华', department: 'CS', tier: 'REACH', degreeType: 'MASTER', campDeadline: null, pushDeadline: null, expectedQuota: null, policyTags: '[]', createdAt: '', updatedAt: '' }] })
@@ -311,6 +356,54 @@ describe('appStore — assets & interviews', () => {
     await useStore.getState().addInterview({ advisorId: 'a1', date: '2026-06-01', format: 'ONLINE', markdownNotes: '' })
 
     expect(mockApi.institution.getAll).toHaveBeenCalled()
+  })
+})
+
+describe('appStore — personal resources', () => {
+  it('loads personal resources', async () => {
+    const resources = [
+      { id: 'r1', name: '简历', localPath: 'D:/docs/resume.docx', kind: 'FILE', fileType: 'docx', category: '简历自荐', tags: '[]', notes: null, sizeBytes: 10, modifiedAt: '2026-06-01', createdAt: '', updatedAt: '' },
+    ]
+    mockApi.personalResource.getAll.mockResolvedValueOnce(resources)
+
+    await useStore.getState().loadPersonalResources()
+
+    expect(mockApi.personalResource.getAll).toHaveBeenCalled()
+    expect(useStore.getState().personalResources).toEqual(resources)
+  })
+
+  it('adds several personal resources from paths and reloads', async () => {
+    mockApi.personalResource.create.mockResolvedValue({})
+    mockApi.personalResource.getAll.mockResolvedValueOnce([])
+
+    await useStore.getState().addPersonalResourcesFromPaths(['D:/a.pdf', 'D:/b.docx'], '申请材料')
+
+    expect(mockApi.personalResource.create).toHaveBeenCalledWith({ localPath: 'D:/a.pdf', category: '申请材料' })
+    expect(mockApi.personalResource.create).toHaveBeenCalledWith({ localPath: 'D:/b.docx', category: '申请材料' })
+    expect(mockApi.personalResource.getAll).toHaveBeenCalled()
+  })
+
+  it('updates a personal resource in local state', async () => {
+    const resource = { id: 'r1', name: '旧名称', localPath: 'D:/a.pdf', kind: 'FILE' as const, fileType: 'pdf', category: '其他', tags: '[]', notes: null, sizeBytes: 10, modifiedAt: null, createdAt: '', updatedAt: '' }
+    const updated = { ...resource, name: '新名称' }
+    useStore.setState({ personalResources: [resource] })
+    mockApi.personalResource.update.mockResolvedValueOnce(updated)
+
+    await useStore.getState().updatePersonalResource('r1', { name: '新名称' })
+
+    expect(mockApi.personalResource.update).toHaveBeenCalledWith('r1', { name: '新名称' })
+    expect(useStore.getState().personalResources).toEqual([updated])
+  })
+
+  it('deletes a personal resource from local state', async () => {
+    const resource = { id: 'r1', name: '资料', localPath: 'D:/a.pdf', kind: 'FILE' as const, fileType: 'pdf', category: '其他', tags: '[]', notes: null, sizeBytes: 10, modifiedAt: null, createdAt: '', updatedAt: '' }
+    useStore.setState({ personalResources: [resource] })
+    mockApi.personalResource.delete.mockResolvedValueOnce(true)
+
+    await useStore.getState().deletePersonalResource('r1')
+
+    expect(mockApi.personalResource.delete).toHaveBeenCalledWith('r1')
+    expect(useStore.getState().personalResources).toEqual([])
   })
 })
 

@@ -7,8 +7,8 @@
  * Copyright (c) 2026. All rights reserved.
  */
 import { app, shell, BrowserWindow, ipcMain, dialog, type OpenDialogOptions } from 'electron'
-import { join, dirname } from 'path'
-import { existsSync, copyFileSync, mkdirSync, writeFileSync } from 'fs'
+import { join, dirname, basename, extname } from 'path'
+import { existsSync, copyFileSync, mkdirSync, writeFileSync, statSync } from 'fs'
 import log from 'electron-log'
 import { spawn } from 'child_process'
 import { initUpdater, autoUpdater } from './updater'
@@ -25,6 +25,15 @@ function getErrorStack(error: unknown): string | undefined {
 // 必须在最早期注册，确保任何未捕获的异常都能记录
 // 注意：dialog.showErrorBox 需要 app.ready 之后才能用，这里只写文件
 type JsonRecord = Record<string, unknown>
+type InstitutionTier = 'REACH' | 'MATCH' | 'SAFETY'
+type PersonalResourceKind = 'FILE' | 'FOLDER'
+type InstitutionMoveTx = {
+  institution: {
+    findUnique: (args: { where: { id: string }; select: { id: true; tier: true } }) => Promise<{ id: string; tier: InstitutionTier } | null>
+    findMany: (args: { where: Record<string, unknown>; select: { id: true }; orderBy?: Array<Record<string, 'asc' | 'desc'>> }) => Promise<Array<{ id: string }>>
+    update: (args: { where: { id: string }; data: { tier?: InstitutionTier; sortOrder: number } }) => Promise<unknown>
+  }
+}
 
 function toRecord(value: unknown, label: string): JsonRecord {
   if (value && typeof value === 'object') {
@@ -120,16 +129,17 @@ async function ensureDatabaseSchema(dbPath: string, shouldBackup: boolean): Prom
     tmpPrisma = new PC({ datasources: { db: { url: `file:${dbPath}` } } })
 
     const rows = await tmpPrisma.$queryRawUnsafe(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('Institution', 'EmailTemplate', 'EmailVariable')"
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('Institution', 'EmailTemplate', 'EmailVariable', 'PersonalResource')"
     )
     const existingTables = new Set((rows as Array<{ name: string }>).map((row) => row.name))
     const needsEmailTables = !existingTables.has('EmailTemplate') || !existingTables.has('EmailVariable')
+    const needsPersonalResourceTable = !existingTables.has('PersonalResource')
     const institutionColumns = existingTables.has('Institution')
       ? await tmpPrisma.$queryRawUnsafe('PRAGMA table_info("Institution")')
       : []
     const needsInstitutionSortOrder = existingTables.has('Institution') && !((institutionColumns as Array<{ name: string }>).some((column) => column.name === 'sortOrder'))
 
-    if (!needsEmailTables && !needsInstitutionSortOrder) {
+    if (!needsEmailTables && !needsInstitutionSortOrder && !needsPersonalResourceTable) {
       log.info('[DB] Database schema is up to date')
       return
     }
@@ -164,6 +174,24 @@ async function ensureDatabaseSchema(dbPath: string, shouldBackup: boolean): Prom
             CONSTRAINT "EmailVariable_templateId_fkey"
               FOREIGN KEY ("templateId") REFERENCES "EmailTemplate" ("id")
               ON DELETE CASCADE ON UPDATE CASCADE
+          )
+        `)
+      }
+      if (needsPersonalResourceTable) {
+        await tmpPrisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "PersonalResource" (
+            "id" TEXT NOT NULL PRIMARY KEY,
+            "name" TEXT NOT NULL,
+            "localPath" TEXT NOT NULL,
+            "kind" TEXT NOT NULL,
+            "fileType" TEXT,
+            "category" TEXT NOT NULL DEFAULT '其他',
+            "tags" TEXT NOT NULL DEFAULT '[]',
+            "notes" TEXT,
+            "sizeBytes" INTEGER,
+            "modifiedAt" DATETIME,
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
           )
         `)
       }
@@ -278,6 +306,22 @@ async function createDatabaseSchema(dbPath: string): Promise<void> {
           "templateId" TEXT NOT NULL,
           "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT "EmailVariable_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "EmailTemplate" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+        )
+      `)
+      await tmpPrisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "PersonalResource" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "name" TEXT NOT NULL,
+          "localPath" TEXT NOT NULL,
+          "kind" TEXT NOT NULL,
+          "fileType" TEXT,
+          "category" TEXT NOT NULL DEFAULT '其他',
+          "tags" TEXT NOT NULL DEFAULT '[]',
+          "notes" TEXT,
+          "sizeBytes" INTEGER,
+          "modifiedAt" DATETIME,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
       `)
       await tmpPrisma.$executeRawUnsafe('COMMIT')
@@ -459,7 +503,7 @@ function parseSortOrder(value: unknown): number {
   return parsed
 }
 
-function parseInstitutionTier(value: unknown): 'REACH' | 'MATCH' | 'SAFETY' {
+function parseInstitutionTier(value: unknown): InstitutionTier {
   if (value === 'REACH' || value === 'MATCH' || value === 'SAFETY') {
     return value
   }
@@ -508,6 +552,84 @@ function buildAdvisorUpdateData(data: unknown): JsonRecord {
   if (input.notes !== undefined) updateData.notes = input.notes
 
   return updateData
+}
+
+function parsePersonalResourceKind(value: unknown): PersonalResourceKind {
+  if (value === 'FILE' || value === 'FOLDER') {
+    return value
+  }
+  throw new Error('Invalid personal resource kind')
+}
+
+function normalizePersonalResourceTags(value: unknown): string {
+  return JSON.stringify(Array.isArray(value) ? value.filter((tag) => typeof tag === 'string' && tag.trim()).map((tag) => tag.trim()) : [])
+}
+
+function getResourcePathMetadata(localPath: string): { kind: PersonalResourceKind; fileType: string | null; sizeBytes: number | null; modifiedAt: Date | null; defaultName: string } {
+  const stats = statSync(localPath)
+  const kind: PersonalResourceKind = stats.isDirectory() ? 'FOLDER' : 'FILE'
+  const extension = kind === 'FILE' ? extname(localPath).replace(/^\./, '').toLowerCase() : null
+  return {
+    kind,
+    fileType: extension || null,
+    sizeBytes: kind === 'FILE' ? stats.size : null,
+    modifiedAt: stats.mtime,
+    defaultName: basename(localPath)
+  }
+}
+
+function buildPersonalResourceCreateData(data: unknown): JsonRecord {
+  const input = toRecord(data, 'personal resource data')
+  if (typeof input.localPath !== 'string' || input.localPath.trim().length === 0) {
+    throw new Error('资料路径不能为空')
+  }
+  const localPath = input.localPath.trim()
+  const metadata = getResourcePathMetadata(localPath)
+  return {
+    name: typeof input.name === 'string' && input.name.trim() ? input.name.trim() : metadata.defaultName,
+    localPath,
+    kind: input.kind === undefined ? metadata.kind : parsePersonalResourceKind(input.kind),
+    fileType: typeof input.fileType === 'string' && input.fileType.trim() ? input.fileType.trim().toLowerCase() : metadata.fileType,
+    category: typeof input.category === 'string' && input.category.trim() ? input.category.trim() : '其他',
+    tags: normalizePersonalResourceTags(input.tags),
+    notes: typeof input.notes === 'string' && input.notes.trim() ? input.notes.trim() : null,
+    sizeBytes: metadata.sizeBytes,
+    modifiedAt: metadata.modifiedAt
+  }
+}
+
+function buildPersonalResourceUpdateData(data: unknown): JsonRecord {
+  const input = toRecord(data, 'personal resource update data')
+  const updateData: JsonRecord = {}
+
+  if (input.name !== undefined) updateData.name = typeof input.name === 'string' && input.name.trim() ? input.name.trim() : ''
+  if (input.localPath !== undefined) {
+    if (typeof input.localPath !== 'string' || input.localPath.trim().length === 0) {
+      throw new Error('资料路径不能为空')
+    }
+    const metadata = getResourcePathMetadata(input.localPath.trim())
+    updateData.localPath = input.localPath.trim()
+    updateData.kind = metadata.kind
+    updateData.fileType = metadata.fileType
+    updateData.sizeBytes = metadata.sizeBytes
+    updateData.modifiedAt = metadata.modifiedAt
+  }
+  if (input.kind !== undefined && updateData.kind === undefined) updateData.kind = parsePersonalResourceKind(input.kind)
+  if (input.fileType !== undefined && updateData.fileType === undefined) updateData.fileType = typeof input.fileType === 'string' && input.fileType.trim() ? input.fileType.trim().toLowerCase() : null
+  if (input.category !== undefined) updateData.category = typeof input.category === 'string' && input.category.trim() ? input.category.trim() : '其他'
+  if (input.tags !== undefined) updateData.tags = normalizePersonalResourceTags(input.tags)
+  if (input.notes !== undefined) updateData.notes = typeof input.notes === 'string' && input.notes.trim() ? input.notes.trim() : null
+
+  return updateData
+}
+
+function buildOpenDialogOptions(options: unknown, fallbackProperties: OpenDialogOptions['properties'], fallbackFilters: OpenDialogOptions['filters']): OpenDialogOptions {
+  const input = options && typeof options === 'object' ? options as { properties?: OpenDialogOptions['properties']; filters?: OpenDialogOptions['filters']; title?: string } : {}
+  return {
+    title: input.title,
+    properties: input.properties || fallbackProperties,
+    filters: input.filters || fallbackFilters
+  }
 }
 
 log.transports.file.level = 'info'
@@ -685,6 +807,71 @@ ipcMain.handle('institution:reorder', async (_, tierValue: unknown, orderedIdsVa
     return true
   } catch (error) {
     log.error('Error reordering institutions:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('institution:move', async (_, idValue: unknown, tierValue: unknown, orderedIdsValue: unknown) => {
+  try {
+    const client = await getPrisma()
+    if (typeof idValue !== 'string' || idValue.length === 0) {
+      throw new Error('institution id must be a non-empty string')
+    }
+    const targetTier = parseInstitutionTier(tierValue)
+    const orderedIds = parseOrderedInstitutionIds(orderedIdsValue)
+    const uniqueIds = new Set(orderedIds)
+    if (uniqueIds.size !== orderedIds.length) {
+      throw new Error('orderedIds cannot contain duplicates')
+    }
+    if (!uniqueIds.has(idValue)) {
+      throw new Error('排序数据必须包含移动的院校')
+    }
+
+    await client.$transaction(async (tx: InstitutionMoveTx) => {
+      const movingSchool = await tx.institution.findUnique({
+        where: { id: idValue },
+        select: { id: true, tier: true }
+      })
+      if (!movingSchool) {
+        throw new Error('院校不存在')
+      }
+
+      const targetSchools = await tx.institution.findMany({
+        where: { tier: targetTier, id: { not: idValue } },
+        select: { id: true }
+      })
+      const expectedIds = new Set([
+        ...targetSchools.map((school: { id: string }) => school.id),
+        idValue
+      ])
+      if (orderedIds.length !== expectedIds.size || !orderedIds.every((schoolId) => expectedIds.has(schoolId))) {
+        throw new Error('排序数据与目标分组不一致，请刷新后重试')
+      }
+
+      for (const [index, schoolId] of orderedIds.entries()) {
+        await tx.institution.update({
+          where: { id: schoolId },
+          data: { tier: targetTier, sortOrder: index }
+        })
+      }
+
+      if (movingSchool.tier !== targetTier) {
+        const sourceSchools = await tx.institution.findMany({
+          where: { tier: movingSchool.tier, id: { not: idValue } },
+          select: { id: true },
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }]
+        })
+        for (const [index, school] of sourceSchools.entries()) {
+          await tx.institution.update({
+            where: { id: school.id },
+            data: { sortOrder: index }
+          })
+        }
+      }
+    })
+    return true
+  } catch (error) {
+    log.error('Error moving institution:', error)
     throw error
   }
 })
@@ -946,25 +1133,100 @@ ipcMain.handle('interview:delete', async (_, id: string) => {
   }
 })
 
+// ============== Personal Resource Library ==============
+
+ipcMain.handle('personalResource:getAll', async () => {
+  try {
+    const client = await getPrisma()
+    return await client.personalResource.findMany({
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }]
+    })
+  } catch (error) {
+    log.error('Error fetching personal resources:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('personalResource:create', async (_, data: unknown) => {
+  try {
+    const client = await getPrisma()
+    return await client.personalResource.create({
+      data: buildPersonalResourceCreateData(data)
+    })
+  } catch (error) {
+    log.error('Error creating personal resource:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('personalResource:update', async (_, id: string, data: unknown) => {
+  try {
+    const client = await getPrisma()
+    const updateData = buildPersonalResourceUpdateData(data)
+    if (Object.keys(updateData).length === 0) {
+      return await client.personalResource.findUnique({ where: { id } })
+    }
+    return await client.personalResource.update({
+      where: { id },
+      data: updateData
+    })
+  } catch (error) {
+    log.error('Error updating personal resource:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('personalResource:delete', async (_, id: string) => {
+  try {
+    const client = await getPrisma()
+    await client.personalResource.delete({ where: { id } })
+    return true
+  } catch (error) {
+    log.error('Error deleting personal resource:', error)
+    throw error
+  }
+})
+
 // ============== File Operations ==============
 
-ipcMain.handle('file:selectFile', async (_, options: any) => {
+ipcMain.handle('file:selectFile', async (_, options: unknown) => {
   try {
     // 使用当前焦点窗口或 BrowserWindow.getFocusedWindow() 作为 fallback
     const targetWindow = mainWindow || BrowserWindow.getFocusedWindow()
-    const dialogOptions: OpenDialogOptions = {
-      properties: ['openFile'],
-      filters: options?.filters || [
+    const dialogOptions = buildOpenDialogOptions(
+      options,
+      ['openFile'],
+      [
         { name: 'Documents', extensions: ['pdf', 'doc', 'docx', 'tex'] },
         { name: 'All Files', extensions: ['*'] }
       ]
-    }
+    )
     const result = targetWindow
       ? await dialog.showOpenDialog(targetWindow, dialogOptions)
       : await dialog.showOpenDialog(dialogOptions)
     return result.canceled ? null : result.filePaths[0]
   } catch (error) {
     log.error('Error selecting file:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('file:selectPaths', async (_, options: unknown) => {
+  try {
+    const targetWindow = mainWindow || BrowserWindow.getFocusedWindow()
+    const dialogOptions = buildOpenDialogOptions(
+      options,
+      ['openFile', 'multiSelections'],
+      [
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    )
+    const result = targetWindow
+      ? await dialog.showOpenDialog(targetWindow, dialogOptions)
+      : await dialog.showOpenDialog(dialogOptions)
+    return result.canceled ? [] : result.filePaths
+  } catch (error) {
+    log.error('Error selecting paths:', error)
     throw error
   }
 })
@@ -1118,6 +1380,7 @@ ipcMain.handle('emailVariable:delete', async (_, id: string) => {
 // ============== Full Backup Export / Import ==============
 
 async function clearApplicationData(tx: any): Promise<void> {
+  await tx.personalResource.deleteMany()
   await tx.emailVariable.deleteMany()
   await tx.emailTemplate.deleteMany()
   await tx.asset.deleteMany()
@@ -1130,7 +1393,7 @@ async function clearApplicationData(tx: any): Promise<void> {
 ipcMain.handle('backup:exportAll', async () => {
   try {
     const client = await getPrisma()
-    const [institutions, orphanTasks, emailTemplates] = await Promise.all([
+    const [institutions, orphanTasks, emailTemplates, personalResources] = await Promise.all([
       client.institution.findMany({
         include: {
           advisors: { include: { assets: true, interviews: true } },
@@ -1138,7 +1401,8 @@ ipcMain.handle('backup:exportAll', async () => {
         }
       }),
       client.task.findMany({ where: { institutionId: null } }),
-      client.emailTemplate.findMany({ include: { variables: true } })
+      client.emailTemplate.findMany({ include: { variables: true } }),
+      client.personalResource.findMany()
     ])
     return {
       success: true,
@@ -1147,7 +1411,8 @@ ipcMain.handle('backup:exportAll', async () => {
         exportedAt: new Date().toISOString(),
         institutions,
         orphanTasks,
-        emailTemplates
+        emailTemplates,
+        personalResources
       }
     }
   } catch (error: unknown) {
@@ -1173,8 +1438,8 @@ ipcMain.handle('backup:importAll', async (_, data: any, options?: { mode?: 'repl
   try {
     const client = await getPrisma()
 
-    const counts = { institutions: 0, orphanTasks: 0, emailTemplates: 0 }
-    const hasImportableData = Array.isArray(data?.institutions) || Array.isArray(data?.orphanTasks) || Array.isArray(data?.emailTemplates)
+    const counts = { institutions: 0, orphanTasks: 0, emailTemplates: 0, personalResources: 0 }
+    const hasImportableData = Array.isArray(data?.institutions) || Array.isArray(data?.orphanTasks) || Array.isArray(data?.emailTemplates) || Array.isArray(data?.personalResources)
     if (!hasImportableData) {
       return { success: false, error: 'Invalid backup data format' }
     }
@@ -1197,6 +1462,13 @@ ipcMain.handle('backup:importAll', async (_, data: any, options?: { mode?: 'repl
             }
           }
           counts.emailTemplates++
+        }
+      }
+
+      if (Array.isArray(data.personalResources)) {
+        for (const resource of data.personalResources) {
+          await tx.personalResource.create({ data: resource })
+          counts.personalResources++
         }
       }
 
